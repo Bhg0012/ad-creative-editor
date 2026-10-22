@@ -1,0 +1,16 @@
+# Core (required)
+pyyaml>=6.0
+pandas>=2.2
+tabulate>=0.9
+numpy>=1.26
+matplotlib>=3.8
+seaborn>=0.13
+pytest>=8.0
+# Transcription (Apple Silicon)
+mlx-whisper>=0.4.3; sys_platform == "darwin" and platform_machine == "arm64"
+# Optional helpers
+scenedetect[opencv]>=0.6
+librosa>=0.10
+statsmodels>=0.14
+scikit-learn>=1.4
+jupyter>=1.0

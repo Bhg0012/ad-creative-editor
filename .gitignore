@@ -1,0 +1,34 @@
+# Media is large and often private: keep it out of git. Back it up separately.
+raw/*
+!raw/.gitkeep
+audio/music/*
+audio/sfx/*
+audio/vo/*
+!audio/**/.gitkeep
+brand/fonts/*
+!brand/fonts/.gitkeep
+brand/proof/
+batches/*/work/
+batches/*/exports/*.mp4
+batches/*/exports/*.mov
+batches/*/statics/*.png
+batches/*/statics/*.jpg
+batches/*/qa/**/*.png
+batches/*/graphics/node_modules/
+*.mp4
+*.mov
+*.wav
+*.m4a
+*.mp3
+
+# Ad data can contain spend and lead info
+data/*
+!data/.gitkeep
+
+# Python / Node
+.venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+.ipynb_checkpoints/
+.DS_Store

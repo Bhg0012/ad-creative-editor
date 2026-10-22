@@ -1,0 +1,62 @@
+# AD VIDEO ENGINE CONFIG
+# Fill in every TBD you can. Anything left as TBD is asked about at the stage
+# that needs it, never guessed. `tools/doctor.py` lists what is still TBD.
+
+business:
+  name: AuburnSEO LLC
+  website: https://auburnseo.com
+  founder_on_camera: Bruce (Auburn University Business Analytics + Marketing student, local, owner-operator)
+  brand_colors:
+    primary: "#3B96F6"
+    accent: "#E55B13"
+  fonts: TBD                   # font files in ./brand/fonts (e.g. Montserrat-ExtraBold.ttf). Must be licensed for commercial use.
+  caption_font_name: Montserrat ExtraBold   # family name as installed; used for burned-in captions
+  logo: ./brand/logo.png       # optional
+
+offer:
+  name: TBD                    # e.g. "Automated Google Review Engine" or "$0-down contractor website"
+  what_they_get: TBD           # concrete deliverables
+  price: TBD                   # write "undecided" if undecided; ads will then never state a price
+  risk_reversal: TBD           # only what you actually offer (guarantee, no contract, cancel anytime)
+  urgency_or_scarcity: TBD     # only REAL constraints, or "none"
+  conversion_event: TBD        # instant_form_lead | booked_call | landing_page_view
+  destination: TBD             # Instant Form, GHL funnel URL, or booking link
+  crm: TBD                     # e.g. GoHighLevel. Needed for Conversion Leads optimization (lead quality)
+
+icp:
+  who: Owners of local trade and home-service businesses (plumbers, electricians, HVAC, roofers, landscapers, painters, concrete, cleaning, detailing)
+  market: TBD                  # ONE per batch: "Auburn-Opelika AL" or "Huntsville AL". Never blend.
+  size: TBD                    # owner-operator, 1-10 employees, etc.
+  known_pains: TBD             # what you hear on sales calls, in their exact words
+  known_objections: TBD        # "I get work from word of mouth", "tried an agency before", "no time"
+
+proof_assets:                  # ONLY real items with permission. Leave lists empty if none.
+  client_results: []           # e.g. {client: "Allstar Concrete", result: "X to Y reviews in Z days", evidence: ./brand/proof/allstar.png, permission: yes}
+  testimonials: []             # {file: ..., person: ..., written_permission: yes}
+  stats_to_use: []             # {stat: ..., source: ..., source_date: ..., verified_on: ...}
+
+footage:
+  raw_dir: ./raw               # A-roll, B-roll, screen recordings, photos. Never modified.
+  music_dir: ./audio/music     # tracks licensed for paid social ads, or Meta Sound Collection
+  sfx_dir: ./audio/sfx         # licensed SFX only
+
+captions:
+  words_per_chunk_max: 4       # 2-5
+  uppercase: false
+  keywords: []                 # words to force-highlight in accent color, e.g. ["reviews", "Huntsville"]
+  fixes: {}                    # transcript spelling fixes, e.g. {"auburn seo": "AuburnSEO", "opelika": "Opelika"}
+
+audio:
+  target_lufs: -14             # convention for social, NOT a published Meta spec (see playbook)
+  true_peak_max_dbtp: -1.0
+
+data:
+  meta_ads_source: TBD         # windsor_mcp | csv
+  past_ads_export: ./data/     # CSV exports from Ads Manager if no connector
+  target_cpl: TBD              # your break-even or goal cost per lead, in USD
+
+batch_defaults:
+  number_of_finished_ads: 6    # 5-10 genuinely different concepts
+  lengths_seconds: [15, 30, 45]
+  aspect_ratios: ["9:16", "4:5"]   # 9:16 for Reels/Stories, 4:5 for Feed. Add "1:1" only if needed.
+  also_make_statics: yes       # 2-3 static image ads per batch
