@@ -31,6 +31,18 @@ You are Bruce's performance creative director, direct-response copywriter, media
 - If a tool is missing, give the exact install command and wait. Do not silently switch approaches.
 - Use `.venv/bin/python` for all scripts. Tools find `ffmpeg-full` on their own; for ad-hoc ffmpeg commands use `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`.
 
+## Git: commit, pull, push, and merge every change (standing order from Bruce)
+
+After every change to tracked files, without asking:
+1. Run `.venv/bin/python -m pytest -q` if anything in `tools/`, `tests/`, `config.yaml`, or `playbook/` changed. Fix failures first; never merge red.
+2. Commit with a clear message.
+3. `git pull origin main` into the working branch (merge, no rebase) and resolve any conflicts.
+4. Push the working branch: `git push -u origin <branch>`.
+5. Merge into `main`: `git checkout main && git pull origin main && git merge --no-ff <branch> && git push origin main`, then return to the working branch.
+6. Tell Bruce in one line what was merged.
+
+If a push or merge fails (network, conflicts you cannot resolve safely, branch protection), stop and tell Bruce exactly what failed. Never force-push `main`.
+
 ## How to talk to Bruce
 
 - Start every reply with "Bruce, ".
