@@ -1,0 +1,322 @@
+# META ADS PLAYBOOK: dated, sourced facts
+#
+# This is the engine's memory of "how Meta ads work right now". Every fact has:
+#   verified_on      date it was last checked against a live source (YYYY-MM-DD)
+#   shelf_life_days  how long before it must be re-checked
+#                    (official specs 180, policy 90, benchmarks 90, algorithm/trend 60, news 30)
+#   confidence       high = Meta's own docs; medium = several independent practitioners agree;
+#                    low = single or vendor source, use as a hint only
+#   applies_as       how the engine may use it: rule | default | heuristic | context
+#
+# `tools/doctor.py` flags expired facts. `/refresh-playbook` re-verifies them and
+# logs every change in playbook/CHANGELOG.md. Never cite an expired fact as current.
+
+facts:
+  - id: reels_safe_zone
+    topic: specs
+    claim: >
+      For 9:16 Reels ads, keep at least the top 14%, bottom 35%, and 6% on each side
+      free of text, logos, and key visuals. On 1080x1920 that is top 269px, bottom 672px,
+      sides 65px. On 1440x2560 that is top 359px, bottom 896px, sides 87px (rounded up).
+    sources:
+      - url: https://www.facebook.com/business/ads-guide/update/video/instagram-reels
+        publisher: Meta Ads Guide
+    verified_on: 2026-10-22
+    shelf_life_days: 180
+    confidence: high
+    applies_as: rule
+    notes: >
+      One third-party source (Billo, 2026) says Meta unified Stories and Reels into one 9:16
+      safe zone in March 2026. Meta's Reels page still shows 14/35/6, which is the stricter
+      set, so design to it.
+
+  - id: reels_video_specs
+    topic: specs
+    claim: >
+      Reels ads: 9:16, recommended 1440x2560, MP4 or MOV, H.264, square pixels, fixed frame
+      rate, progressive scan, stereo AAC at 128 kbps or higher, max 4 GB, 0 s to 15 min.
+      Captions "optional but recommended"; sound "optional but strongly recommended".
+      Reels ad primary text displays about 44 characters.
+    sources:
+      - url: https://www.facebook.com/business/ads-guide/update/video/instagram-reels
+        publisher: Meta Ads Guide
+    verified_on: 2026-10-22
+    shelf_life_days: 180
+    confidence: high
+    applies_as: rule
+    notes: 1080x1920 is accepted. Render 1440x2560 when the source footage is at least 1440 px wide; never upscale soft footage to fake it.
+
+  - id: feed_video_specs
+    topic: specs
+    claim: >
+      Facebook Feed video: recommended 4:5 at 1440x1800, H.264, stereo AAC 128 kbps+, max 4 GB.
+      Recommended primary text 50-150 characters, headline 27 characters.
+    sources:
+      - url: https://www.facebook.com/business/ads-guide/update/video/facebook-feed
+        publisher: Meta Ads Guide
+    verified_on: 2026-10-22
+    shelf_life_days: 180
+    confidence: high
+    applies_as: rule
+    notes: 1080x1350 is accepted. 1:1 is no longer the recommended Feed ratio; only make it on request.
+
+  - id: learning_phase
+    topic: delivery
+    claim: >
+      An ad set exits learning after roughly 50 optimization events within 7 days of its last
+      significant edit. Significant edits include pausing, changing the optimization event,
+      audience, or creative (adding a new ad), and large budget or bid changes. If an ad set is
+      unlikely to reach ~50 events it shows "Learning limited"; fixes are consolidating ad sets,
+      broadening audience, raising budget, or optimizing for a more frequent event. Batch edits
+      together so they cost one learning period, not several.
+    sources:
+      - url: https://www.facebook.com/business/help/942374239243867
+        publisher: Meta Business Help Center (Last significant edit)
+      - url: https://en-gb.facebook.com/business/help/269269737396981
+        publisher: Meta Business Help Center (About learning limited)
+    verified_on: 2026-10-22
+    shelf_life_days: 90
+    confidence: high
+    applies_as: rule
+    notes: >
+      "Change budget by no more than ~20% at a time" is practitioner lore, not a Meta number.
+      Use it as a heuristic only.
+
+  - id: creative_similarity
+    topic: algorithm
+    claim: >
+      Meta's ad retrieval system (Andromeda) appears to group creatives that look, read, or
+      sound alike and give the group roughly one ad's worth of delivery. Changing only the
+      on-screen text, color, or caption is likely to be treated as the same ad. Diversity must
+      be conceptual: different angle, different person or setting, different format, different
+      opening shot and opening line.
+    sources:
+      - url: https://adsuploader.com/blog/meta-andromeda
+        publisher: AdsUploader (2026)
+      - url: https://www.recharm.com/blog/what-is-andromeda-and-creative-similarity
+        publisher: Recharm (2026)
+      - url: https://segwise.ai/blog/meta-andromeda-update-creative-strategy-2026
+        publisher: Segwise (2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: default
+    notes: >
+      "Entity ID" is practitioner shorthand, not an official Meta term. Specific similarity
+      thresholds quoted online (e.g. 40% / 60%) have no Meta source; do not cite them.
+      Some accounts report a "creative similarity" indicator in Ads Manager; check yours.
+
+  - id: creative_volume
+    topic: algorithm
+    claim: >
+      Practitioner guidance in 2026 is several conceptually distinct concepts per ad set
+      (commonly quoted 8-12 per campaign for larger budgets) with a few variations each,
+      rather than many near-copies.
+    sources:
+      - url: https://segwise.ai/blog/meta-andromeda-update-creative-strategy-2026
+        publisher: Segwise (2026)
+      - url: https://clutch.co/resources/meta-andromeda-update-2026
+        publisher: Clutch (2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: heuristic
+    notes: >
+      On a small local budget, more ads than the budget can feed means none get enough spend
+      to judge. Size the batch to budget: each live ad needs enough spend to reach the
+      evaluation threshold in tools/metrics.py.
+
+  - id: advantage_creative_enhancements
+    topic: delivery
+    claim: >
+      Advantage+ creative enhancements (text improvements, added music, image-to-video,
+      AI-generated backgrounds/overlays, translations, etc.) are controlled per feature and
+      several are reported to be ON by default. As of October 2026 Meta made converting static
+      images to video a default. Enhancements can change wording, add unlicensed-feeling music,
+      or generate visuals, which can break message match, proof integrity, or compliance.
+    sources:
+      - url: https://developers.facebook.com/documentation/ads-commerce/marketing-api/creative/advantage-creative/get-started
+        publisher: Meta for Developers
+      - url: https://www.jumpfly.com/blog/metas-advantage-settings-why-they-keep-reappearing-and-how-to-stay-in-control/
+        publisher: JumpFly
+      - url: https://techhubinsight.com/meta-ai-ad-tools-advertising-week-2026/
+        publisher: TechHub Insight (Oct 2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: rule
+    notes: >
+      Rule: before publishing, open every ad's creative enhancement settings AND the ad
+      account's creative feature defaults, and turn off anything not deliberately tested.
+      Re-check after Meta UI updates; settings have been reported to reappear.
+
+  - id: ai_content_disclosure
+    topic: policy
+    claim: >
+      Meta permits AI-generated or AI-edited ad creative but labels it ("AI info"). Labels are
+      applied automatically for Meta's own gen-AI tools and for files carrying C2PA content
+      credentials; photorealistic AI content from other tools should be disclosed with the
+      AI disclosure control when uploading.
+    sources:
+      - url: https://www.cinerads.com/blog/ai-ugc-facebook-ad-policy
+        publisher: Cinerads (2026)
+      - url: https://novoads.ai/en/blog/ai-ad-label-rules-2026
+        publisher: NovoAds (2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 90
+    confidence: medium
+    applies_as: rule
+    notes: >
+      House rule regardless of Meta: never use AI-generated people, voices, reviews, or
+      screenshots as if they were real customers or real results.
+
+  - id: personal_attributes
+    topic: policy
+    claim: >
+      Ads must not assert or imply personal attributes of the viewer (race, religion, sexual
+      orientation, disability, health, financial status, criminal record, name, etc.), directly
+      or indirectly. Call out by trade and location ("Huntsville roofers"), never by hardship
+      ("Struggling to pay your bills?").
+    sources:
+      - url: https://transparency.meta.com/policies/ad-standards/objectionable-content/privacy-violations-personal-attributes/
+        publisher: Meta Transparency Center
+    verified_on: 2026-10-22
+    shelf_life_days: 180
+    confidence: high
+    applies_as: rule
+
+  - id: music_licensing
+    topic: policy
+    claim: >
+      Meta Sound Collection tracks may be used commercially, including in ads, on Meta
+      platforms only. The in-app trending/licensed music library is for personal, non-commercial
+      use and must not be used in ads. Meta's Reels ad guide lists "No licensed music. Use
+      original audio or royalty-free music from the Meta Sound Collection."
+    sources:
+      - url: https://www.facebook.com/business/ads-guide/update/video/instagram-reels
+        publisher: Meta Ads Guide
+      - url: https://musicbusinessworldwide.com/meta-offers-royalty-free-music-library-to-instagram-reels-advertisers
+        publisher: Music Business Worldwide
+    verified_on: 2026-10-22
+    shelf_life_days: 180
+    confidence: medium
+    applies_as: rule
+    notes: >
+      A stock-music subscription is fine only if its license explicitly covers paid social ads
+      for your business. Keep the license file next to each track in ./audio/music.
+
+  - id: loudness
+    topic: specs
+    claim: >
+      Meta publishes no loudness target for ads. Common social-video practice is about
+      -14 LUFS integrated with true peak at or below -1 dBTP; some guides suggest louder
+      (-10 to -12 LUFS) for Reels. Meta applies its own loudness handling (xHE-AAC) on Reels and
+      Stories playback.
+    sources:
+      - url: https://www.socialmediatoday.com/news/meta-updates-audio-encoding-for-reels-and-stories-to-provide-more-volume-co/647414
+        publisher: Social Media Today
+      - url: https://filmandflow.beehiiv.com/p/the-ultimate-lufs-guide-perfect-audio-for-social-media
+        publisher: Film and Flow
+    verified_on: 2026-10-22
+    shelf_life_days: 180
+    confidence: low
+    applies_as: default
+    notes: Default target lives in config.yaml (audio.target_lufs). Voice clarity matters more than the exact number.
+
+  - id: hook_hold_benchmarks
+    topic: benchmarks
+    claim: >
+      Biddy Co. study, June-August 2026, 479 US video ads with $1k+ spend each (17 accounts,
+      consumer + apps, NOT local services): hook rate (3 s plays / impressions) median 20.9%,
+      middle 50% 14.2%-30.4%, top 10% 44.8%+. ThruPlays / impressions median 4.6%
+      (middle 50% 3.0%-7.3%). 3 s-to-ThruPlay retention median 22%. Median average watch time
+      about 4 s. Top-quartile hook-rate ads had about 1.5x the CTR of bottom-quartile ones;
+      CTR and hold were nearly uncorrelated.
+    sources:
+      - url: https://www.biddyco.com/blog-posts/hook-rate-benchmarks-meta
+        publisher: Biddy Co. (2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 90
+    confidence: medium
+    applies_as: context
+    notes: >
+      Many blogs quote 25-30%+ as a "good" hook rate; this larger dataset says ~21% is median.
+      Always compare an ad against your own account median first; use these only as rough context.
+      Definitions vary across sources; this engine's definitions are in tools/metrics.py.
+
+  - id: cpl_benchmarks
+    topic: benchmarks
+    claim: >
+      Vendor-compiled 2026 Meta CPL averages for home services cluster around $34-46 per lead,
+      with high-ticket trades (roofing, HVAC installs) often above $100. These describe
+      contractors buying leads from homeowners, NOT an agency selling to contractors (B2B),
+      which usually costs more per lead.
+    sources:
+      - url: https://www.adamigo.ai/blog/meta-ads-cost-per-lead-benchmarks-industry-2026
+        publisher: Adamigo (2026)
+      - url: https://skillupexperts.com/meta-ads-agency/cost-per-lead-by-industry/
+        publisher: SkillUp Experts (2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 90
+    confidence: low
+    applies_as: context
+    notes: Do not set targets from these. Set target_cpl from your own close rate and deal value.
+
+  - id: conversion_leads
+    topic: lead_quality
+    claim: >
+      For lead gen, Meta is steering advertisers toward the Conversion Leads performance goal,
+      which optimizes for leads that later qualify or book, using lead-stage events sent back
+      from the CRM via the Conversions API for CRM. This needs a CRM integration and a minimum
+      lead volume (check current eligibility in Ads Manager).
+    sources:
+      - url: https://www.clickheredigital.com/insights/meta-shift-to-lead-optimization
+        publisher: Click Here Digital (2026)
+      - url: https://www.make.com/en/blog/meta-make-conversions-api-for-crm
+        publisher: Make
+    verified_on: 2026-10-22
+    shelf_life_days: 90
+    confidence: medium
+    applies_as: default
+    notes: >
+      Until volume allows Conversion Leads, use an Instant Form with the "Higher intent"
+      form type and qualifying questions, and send booked-call events to Meta from the CRM.
+
+  - id: local_service_creative_trends
+    topic: trends
+    claim: >
+      2026 practitioner consensus for lead gen and local services: phone-shot, native,
+      single-person UGC-style video and founder-on-camera content beat polished brand video;
+      before/after visuals and real project/client proof carry the most weight; viewers now
+      spot staged "fake UGC" quickly, so it must be genuinely unscripted-feeling.
+    sources:
+      - url: https://adligator.com/blog/facebook-ad-creative-trends-2026
+        publisher: Adligator (2026)
+      - url: https://www.gethookd.ai/learn/5-best-lead-generation-facebook-ad-examples-to-try-in-2026/
+        publisher: Hookd (2026)
+      - url: https://creeksidemarketingpros.com/blog/facebook-ads-for-home-service-companies/
+        publisher: Creekside Marketing (2026)
+    verified_on: 2026-10-22
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: default
+
+  - id: meta_news_2026_10
+    topic: news
+    claim: >
+      October 2026: Advantage+ creative image-to-video became a default; Ads Creative Studio
+      rollout widened (edit hooks, audio, clip length, captions, end scenes); a business AI
+      assistant that edits campaigns is in testing; per-creative audiences opened to Marketing
+      API partners (Oct 19); updated Commercial and Self-Serve Ad Terms reported to take effect
+      Oct 30, 2026, including advertiser responsibility for AI-generated content.
+    sources:
+      - url: https://techhubinsight.com/meta-ai-ad-tools-advertising-week-2026/
+        publisher: TechHub Insight
+      - url: https://adsuploader.com/blog/meta-ads-updates
+        publisher: AdsUploader
+      - url: https://ppc.land/metas-per-creative-audiences-force-ad-sets-to-stay-open-to-all-genders/
+        publisher: PPC Land
+    verified_on: 2026-10-22
+    shelf_life_days: 30
+    confidence: low
+    applies_as: context
