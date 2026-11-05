@@ -320,3 +320,118 @@ facts:
     shelf_life_days: 30
     confidence: low
     applies_as: context
+
+  - id: hormozi_vibe_editing_ads
+    topic: news
+    claim: >
+      Alex Hormozi's Facebook page (Ad Library page id 116482854782233) has been running a
+      paid lead-magnet campaign titled "Get the Free Vibe Editing System" since 2026-10-07,
+      with new ad waves on Oct 28, Oct 29 and Nov 3, 2026 (about 50-60 ads). Copy: an in-house
+      editor built it, you "talk to it in plain English", it "turns your long videos into
+      finished, on-brand clips", you "download it free, paste in our setup code". Landing page
+      lp.acquisition.com/vibe-editing. The download's contents are unverified; the setup-code
+      pattern matches Claude Code / Claude Cowork video skills built on ffmpeg plus Whisper.
+    sources:
+      - url: https://www.facebook.com/ads/library/?id=4260324617461655
+        publisher: Meta Ad Library (via Meta Ads MCP, 2026-11-05)
+      - url: https://lp.acquisition.com/vibe-editing
+        publisher: Acquisition.com landing page (not fetched; blocked in the research session)
+    verified_on: 2026-11-05
+    shelf_life_days: 30
+    confidence: low
+    applies_as: context
+    notes: >
+      Hormozi's creative doctrine is unchanged (GOATed Ads playbook): 50 hooks x 3-5 bodies x
+      1-3 CTAs per week, 80% of prep on hooks, steal hooks from your own content and saved ads,
+      double down on outliers. The AI editor is a lead magnet that lowers the cost of volume.
+
+  - id: agentic_editing_recipe
+    topic: trends
+    claim: >
+      The 2026 open-source consensus for editing short-form video with Claude Code (video-use,
+      30k+ stars; Remotion agent skills; claude-shorts; ghost-editor; mrpaidsocial editor
+      agent): transcribe every take to word-level JSON and let the model read text rather than
+      watch pixels; the model proposes a cut strategy that a human approves; a JSON or YAML EDL
+      drives per-segment ffmpeg extraction and concat; never cut inside a word; pad cut edges
+      30-200 ms for timestamp drift; apply captions last; verify the output with ffprobe,
+      loudness meters, and by re-transcribing the cut rather than trusting the plan.
+    sources:
+      - url: https://github.com/browser-use/video-use
+        publisher: browser-use (GitHub)
+      - url: https://github.com/remotion-dev/skills
+        publisher: Remotion (GitHub)
+      - url: https://github.com/mrpaidsocial/mrpaidsocial-video-editor-agent
+        publisher: Mr. Paid Social (GitHub)
+    verified_on: 2026-11-05
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: default
+    notes: This engine follows the same shape (tools/transcribe.py, selects.py, render.py with an EDL, qa.py).
+
+  - id: captions_sound_off
+    topic: trends
+    claim: >
+      Facebook's own 2016 test reported captions raised average video view time by about 12%
+      and that 41% of videos were "meaningless without sound". The often-quoted "85% watched
+      with sound off" is a Digiday estimate, not Meta data. No independent A/B study shows a
+      specific caption style (word-by-word "Hormozi", karaoke, or clean sentence pages) wins;
+      vendor claims of +25-80% completion are unsourced.
+    sources:
+      - url: https://www.3playmedia.com/blog/captions-increase-viewership-for-facebook-video-ads/
+        publisher: 3Play Media (summarizing Facebook's 2016 announcement)
+    verified_on: 2026-11-05
+    shelf_life_days: 180
+    confidence: medium
+    applies_as: default
+    notes: Keep captions on every ad; test caption styles as variants rather than assuming one converts.
+
+  - id: creative_hit_rate
+    topic: benchmarks
+    claim: >
+      Motion Creative Benchmarks 2026 (578,750 creatives, 6,015 accounts, $1.29B spend,
+      Sep 2025 to Jan 2026): a "winner" (at least 10x the account's median creative spend and
+      $500+) is about 5% of creatives; hit rate 3.8% for accounts under $10K/month rising to
+      8.2% above $1M/month. Expect roughly 1 winner per 15-25 concepts at small spend.
+    sources:
+      - url: https://library.motionapp.com/research/creative-benchmarks-2026
+        publisher: Motion
+    verified_on: 2026-11-05
+    shelf_life_days: 90
+    confidence: medium
+    applies_as: context
+    notes: Mostly ecommerce accounts. Use it to set expectations for volume, not as a target.
+
+  - id: creatives_per_adset
+    topic: algorithm
+    claim: >
+      AdScale's observational analysis of 1,200+ ecommerce accounts: ad sets with 4-6 active
+      creatives had about 22% higher CTR than those with 1-2; beyond 7, CTR plateaued and CPM
+      rose 8-12%. Meta's only published number is "at least 20 diversified ads" for Advantage+
+      shopping campaigns (Nov 2024). Working rule: 4-8 genuinely different concepts per ad set.
+    sources:
+      - url: https://www.adscale.com/blog/how-many-ad-creatives-per-ad-set
+        publisher: AdScale
+    verified_on: 2026-11-05
+    shelf_life_days: 60
+    confidence: low
+    applies_as: heuristic
+    notes: Single vendor, ecommerce sample. Consistent with creative_similarity and creative_volume.
+
+  - id: creative_fatigue
+    topic: algorithm
+    claim: >
+      Practitioner consensus on fatigue signals: frequency rising while CTR falls and CPM or
+      CPA rises. Early warning about 10% CTR drop over 7 days; confirmed at about 15-20% drop
+      over 14 days with CPM up roughly 18% and prospecting frequency above 2.5 per week. Ads
+      Manager may show "Creative limited" or "Creative fatigue". Refresh between the first CTR
+      drop and the CPA spike.
+    sources:
+      - url: https://segwise.ai/blog/how-to-measure-creative-fatigue
+        publisher: Segwise
+      - url: https://library.motionapp.com/glossary/hold-rate
+        publisher: Motion glossary
+    verified_on: 2026-11-05
+    shelf_life_days: 60
+    confidence: low
+    applies_as: heuristic
+    notes: Thresholds differ by source; calibrate to the account after the first batch.

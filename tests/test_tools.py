@@ -256,3 +256,163 @@ def test_no_em_dashes_anywhere():
             except UnicodeDecodeError:
                 pass
     assert not offenders, offenders
+
+
+# ---------- render / selects / statics ----------
+
+import render  # noqa: E402
+import selects  # noqa: E402
+import statics  # noqa: E402
+
+
+@pytest.fixture(scope="session")
+def footage(tmp_path_factory):
+    """A fake batch folder: landscape A-roll, portrait A-roll with a silence gap, a still, green B-roll, music, SFX."""
+    b = tmp_path_factory.mktemp("batch")
+    (b / "BATCH.md").write_text("# test batch\n")
+    for d in ("raw", "audio", "work/edl", "work/transcripts"):
+        (b / d).mkdir(parents=True)
+    ff("-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30:duration=8",
+       "-f", "lavfi", "-i", "sine=frequency=330:sample_rate=44100:duration=8",
+       "-af", "volume=0.3,apulsator=hz=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+       str(b / "raw" / "landscape.mp4"))
+    # portrait: tone 0-1s, silence 1-2s, tone 2-4s (a gap to tighten)
+    ff("-f", "lavfi", "-i", "testsrc=size=1080x1920:rate=30:duration=4",
+       "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4",
+       "-af", "volume=0.3,volume=enable='between(t,1,2)':volume=0", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+       "-c:a", "aac", "-shortest", str(b / "raw" / "portrait.mp4"))
+    ff("-f", "lavfi", "-i", "color=c=green:s=1280x720:rate=24:duration=3", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+       "-an", str(b / "raw" / "broll.mp4"))
+    ff("-f", "lavfi", "-i", "color=c=orange:s=800x600:d=1", "-frames:v", "1", str(b / "raw" / "still.png"))
+    ff("-f", "lavfi", "-i", "sine=frequency=110:sample_rate=48000:duration=3", "-af", "volume=0.5",
+       "-c:a", "libmp3lame", str(b / "audio" / "music.mp3"))
+    ff("-f", "lavfi", "-i", "sine=frequency=2000:sample_rate=48000:duration=0.2", str(b / "audio" / "whoosh.wav"))
+    (b / "work" / "transcripts" / "landscape.words.json").write_text(json.dumps(WORDS))
+    (b / "work" / "edl" / "TEST_offer_angle_question_10s_9x16_v1.yaml").write_text("""
+name: TEST_offer_angle_question_10s_9x16_v1
+ratio: "9:16"
+hook_text: "Huntsville roofers: only 9 reviews?"
+hook_text_seconds: 2
+clips:
+  - {src: raw/landscape.mp4, in: 1.0, out: 3.0, focus: auto}
+  - {src: raw/portrait.mp4, in: 0.0, out: 4.0, zoom: 1.1, tighten: 0.5}
+  - {src: raw/landscape.mp4, in: 5.0, out: 6.0, push: 1.08}
+  - {src: raw/still.png, duration: 1.0, push: 1.1}
+broll:
+  - {src: raw/broll.mp4, at: 1.0, duration: 1.0, label: "A text goes out"}
+lower_third: {text: "Bruce, Auburn AL", at: 0.5, duration: 1.5}
+music: {src: audio/music.mp3, gain_db: -16, duck: true}
+sfx:
+  - {src: audio/whoosh.wav, at: 1.0, gain_db: -8}
+end_card: {text: "Tap Learn More", subtext: "Huntsville contractors", seconds: 1.5}
+""")
+    return b
+
+
+def mean_rgb(video: Path, t: float) -> tuple[float, float, float]:
+    raw = subprocess.run([FF, "-nostdin", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                          "-vf", "crop=iw*0.6:ih*0.3:iw*0.2:ih*0.4,scale=8:8", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                         capture_output=True).stdout
+    px = [raw[i:i + 3] for i in range(0, len(raw), 3)]
+    return tuple(sum(p[c] for p in px) / len(px) for c in range(3))
+
+
+def test_crop_box_and_resolution():
+    assert render.crop_box(1920, 1080, "9:16", (0.5, 0.5), 1.0) == (606, 1080, 656, 0)
+    w, h, x, y = render.crop_box(1920, 1080, "9:16", (0.9, 0.5), 1.0)
+    assert x + w <= 1920 and x >= 1300  # focus near the right edge is clamped inside the frame
+    w, h, *_ = render.crop_box(1080, 1920, "4:5", (0.5, 0.5), 1.1)
+    assert abs(w / h - 0.8) < 0.01 and w < 1080
+    assert render.pick_resolution("9:16", 1440) == (1440, 2560)
+    assert render.pick_resolution("9:16", 1080) == (1080, 1920)
+
+
+def test_tighten_ranges_keeps_edges_and_shortens_gaps():
+    gaps = [(0.0, 0.3), (2.0, 3.0), (4.8, 5.0)]
+    assert render.tighten_ranges(0.0, 5.0, gaps, keep=0.12) == [(0.0, 2.12), (2.88, 5.0)]
+    assert render.tighten_ranges(0.0, 5.0, [], keep=0.12) == [(0.0, 5.0)]
+
+
+def test_silence_detection_finds_the_gap(footage):
+    gaps = render.silences(footage / "raw" / "portrait.mp4", 0.0, 4.0, 0.5)
+    assert len(gaps) == 1 and abs(gaps[0][0] - 1.0) < 0.15 and abs(gaps[0][1] - 2.0) < 0.15
+
+
+def test_render_proxy_and_final(footage):
+    edl = footage / "work" / "edl" / "TEST_offer_angle_question_10s_9x16_v1.yaml"
+    proxy = render.render(edl, None, None, proxy=True, keep_tmp=False, out_dir=None)
+    assert proxy.exists() and proxy.parent.name == "proxies"
+    info = common.probe(proxy)
+    assert int(common.video_stream(info)["width"]) == 540
+
+    master = render.render(edl, None, None, proxy=False, keep_tmp=False, out_dir=None)
+    assert master.name.endswith("_master.mp4")
+    final = render.render(edl, None, str(footage / "work" / "transcripts" / "landscape.words.json"),
+                          proxy=False, keep_tmp=False, out_dir=None)
+    assert final.parent.name == "exports"
+    info = common.probe(final)
+    v, a = common.video_stream(info), common.audio_stream(info)
+    assert (int(v["width"]), int(v["height"])) == (1080, 1920)
+    assert v["r_frame_rate"] == "30/1" and a["codec_name"] == "aac" and a.get("channels") == 2
+    dur = float(info["format"]["duration"])
+    # 2.0 + (4.0 tightened to ~3.24) + 1.0 + 1.0 + end card 1.5 = about 8.7 s
+    assert 8.2 < dur < 9.2, dur
+    r, g, b = mean_rgb(final, 1.5)       # inside the green B-roll window (ffmpeg green is 0x008000)
+    assert g > 90 and g > 2 * r and g > 2 * b, (r, g, b)
+    r, g, b = mean_rgb(final, 2.6)       # back on A-roll (testsrc2 is not green)
+    assert not (g > 90 and g > 2 * r and g > 2 * b), (r, g, b)
+    sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
+    assert [c["src"] for c in sidecar["clips"]][-1] == "end_card"
+    assert sidecar["broll"][0]["at"] == 1.0 and sidecar["graphics"][0]["type"] == "hook_text"
+    assert len(sidecar["clips"]) == 6  # the tightened clip became two segments
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
+    assert not [k for k, v in s.items() if v == "FAIL"], s
+    feed = render.render(edl, "4:5", None, proxy=True, keep_tmp=False, out_dir=None)
+    assert "_4x5_" in feed.name
+
+
+def test_captions_styles_are_well_formed():
+    for style in captions.STYLES:
+        ass = captions.build_ass(WORDS, 1080, 1920, font="DejaVu Sans", accent="#E55B13", style=style)
+        n = ass.count("Dialogue:")
+        assert n >= 3, style
+        assert EM_DASH not in ass
+        if style in ("highlight", "reveal", "hormozi"):
+            assert n == len(WORDS)  # one event per spoken word
+        if style == "karaoke":
+            assert "\\kf" in ass
+        if style == "hormozi":
+            assert "HUNTSVILLE" in ass
+    with pytest.raises(SystemExit):
+        captions.build_ass(WORDS, 1080, 1920, font="x", accent="#E55B13", style="nope")
+
+
+def test_selects_matches_lines(footage, tmp_path):
+    script = tmp_path / "script.md"
+    script.write_text("| [0-3s] | Huntsville roofers, your competitor has 140 reviews. | text | A-roll |\n"
+                      "Something that was never said on camera at all\n")
+    out, edl = tmp_path / "selects.md", tmp_path / "draft.yaml"
+    sys_argv = ["selects.py", "--script", str(script), "--transcripts", str(footage / "work" / "transcripts"),
+                "--out", str(out), "--edl", str(edl), "--name", "T_a_b_c_15s_9x16_v1", "--raw", str(footage / "raw")]
+    import unittest.mock as um
+    with um.patch.object(sys, "argv", sys_argv):
+        assert selects.main() == 0
+    md = out.read_text()
+    assert "| 1 | landscape | 0.00 |" in md and "NOT FOUND" in md
+    y = common.load_yaml(edl)
+    assert len(y["clips"]) == 1 and y["clips"][0]["src"].endswith("landscape.mp4")
+
+
+def test_statics_builds_png(footage, tmp_path):
+    out = statics.build(footage / "raw" / "still.png", "4:5", "Huntsville roofers: only 9 reviews?",
+                        "Your competitor has 140.", "Tap Learn More", tmp_path / "s.png")
+    from PIL import Image
+    assert Image.open(out).size == (1440, 1800)
+
+
+def test_find_font_prefers_brand_folder(tmp_path):
+    (tmp_path / "Montserrat-ExtraBold.ttf").write_bytes(b"x")
+    path, exact = common.find_font("Montserrat ExtraBold", tmp_path)
+    assert exact and path.endswith("Montserrat-ExtraBold.ttf")
+    path, exact = common.find_font("Montserrat ExtraBold", tmp_path / "nope")
+    assert not exact

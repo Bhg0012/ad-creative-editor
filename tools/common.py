@@ -124,3 +124,62 @@ def load_yaml(path: Path) -> dict:
 
 def load_config() -> dict:
     return load_yaml(ROOT / "config.yaml")
+
+
+def even(n: float) -> int:
+    """Round down to a non-negative even integer (yuv420p needs even sizes and offsets)."""
+    return max(0, int(n) // 2 * 2)
+
+
+def is_hdr(stream: dict) -> bool:
+    return stream.get("color_transfer") in {"arib-std-b67", "smpte2084"}
+
+
+def video_stream(info: dict) -> dict | None:
+    return next((s for s in info.get("streams", []) if s.get("codec_type") == "video"
+                 and not (s.get("disposition") or {}).get("attached_pic")), None)
+
+
+def audio_stream(info: dict) -> dict | None:
+    return next((s for s in info.get("streams", []) if s.get("codec_type") == "audio"), None)
+
+
+def _norm_name(s: str) -> str:
+    return "".join(ch for ch in s.lower() if ch.isalnum())
+
+
+def find_font(name: str, fonts_dir: Path | None = None) -> tuple[str | None, bool]:
+    """Resolve a font family name to a file.
+
+    Returns (path, exact). `exact` is True when a file in brand/fonts matches the
+    name; False when fontconfig supplied a substitute (or nothing was found).
+    drawtext needs a file path; libass needs the family name plus fontsdir.
+    """
+    fonts_dir = fonts_dir or ROOT / "brand" / "fonts"
+    want = _norm_name(name)
+    if fonts_dir.exists():
+        files = sorted(p for p in fonts_dir.iterdir() if p.suffix.lower() in {".ttf", ".otf"})
+        for p in files:
+            if _norm_name(p.stem) == want:
+                return str(p), True
+        for p in files:
+            stem = _norm_name(p.stem)
+            if want in stem or stem in want:
+                return str(p), True
+    fc = shutil.which("fc-match")
+    if fc:
+        res = subprocess.run([fc, "-f", "%{file}", name], capture_output=True, text=True)
+        path = res.stdout.strip()
+        if path and Path(path).exists():
+            return path, _norm_name(Path(path).stem).startswith(want.split()[0] if want else "")
+    return None, False
+
+
+def run_ffmpeg(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    """Run ffmpeg quietly; raise with the tail of stderr on failure."""
+    cmd = [ffmpeg(), "-nostdin", "-hide_banner", "-y", "-v", "error", *args]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if check and res.returncode != 0:
+        tail = "\n".join(res.stderr.strip().splitlines()[-12:])
+        raise RuntimeError(f"ffmpeg failed ({res.returncode}):\n  {' '.join(cmd)}\n{tail}")
+    return res

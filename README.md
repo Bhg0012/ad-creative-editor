@@ -11,6 +11,8 @@ git clone <this repo> && cd ad-creative-editor
 tools/setup_mac.sh          # installs ffmpeg-full, Python venv, mlx-whisper, then runs the doctor
 ```
 
+Everything in the pipeline is free and runs on the Mac: ffmpeg, Whisper (mlx-whisper or WhisperX), OpenCV for face-centered reframing, Pillow for statics, and Claude Code as the editor's brain. No render API, no subscription, no upload of footage anywhere.
+
 Then:
 1. Fill in every `TBD` you can in `config.yaml` (offer, market, target CPL, etc.).
 2. Put fonts (commercially licensed) in `brand/fonts/`, logo in `brand/`, real proof screenshots in `brand/proof/`.
@@ -44,8 +46,11 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/doctor.py` | Tools installed, config gaps, playbook freshness |
 | `tools/new_batch.py` | Scaffold a batch folder |
 | `tools/inventory.py` | ffprobe every file in `raw/` (rotation, VFR, HDR, resolution flags) |
-| `tools/transcribe.py` | Word-level transcripts with mlx-whisper |
-| `tools/captions.py` | Burned-in caption file (.ass) from a transcript, inside the safe zone, keyword highlight |
+| `tools/transcribe.py` | Word-level transcripts (mlx-whisper, WhisperX, or faster-whisper, whichever is installed) |
+| `tools/selects.py` | Best take per script line from the transcripts, plus a draft EDL |
+| `tools/render.py` | EDL (yaml) to finished ad: reframe to 9:16 or 4:5 around the face, punch-ins, pause tightening, B-roll, hook text, lower third, ducked music, SFX, end card, two-pass loudness, captions. `--proxy` for rough cuts |
+| `tools/captions.py` | Caption file (.ass) from a transcript: chunk, highlight, karaoke, reveal, or hormozi style, inside the safe zone |
+| `tools/statics.py` | Static image ads (4:5, 9:16) from a photo or a frame, headline + CTA inside the safe zone |
 | `tools/qa.py` | Spec, loudness, black-frame, silent-open, and opening-similarity checks plus evidence images |
 | `tools/metrics.py` | Hook rate, hold rate, CTR, CPL, verdicts, and grouping by angle / hook / length / ratio |
 

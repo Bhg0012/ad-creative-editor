@@ -2,6 +2,16 @@
 
 Every `/refresh-playbook` run adds an entry: date, facts re-verified, facts changed (old -> new, with source), facts added or retired.
 
+## 2026-11-05: agentic editor research
+
+Added (sourced in `docs/2026-11-05_agentic-editor-research-and-plan.md`): `hormozi_vibe_editing_ads`
+(what Bruce saw: Hormozi's "Get the Free Vibe Editing System" lead-magnet campaign, live since
+2026-10-07), `agentic_editing_recipe` (the open-source Claude Code editing consensus the engine now
+follows), `captions_sound_off`, `creative_hit_rate`, `creatives_per_adset`, `creative_fatigue`.
+Tools changed as a result: new `tools/render.py` (EDL to finished ad), `tools/selects.py`,
+`tools/statics.py`; caption styles in `tools/captions.py`; multi-backend `tools/transcribe.py`.
+Existing facts were not re-verified in this pass (all still within shelf life).
+
 ## 2026-10-22: initial build
 
 Verified all facts in `facts.yaml` against live sources. Corrections to the original master prompt:

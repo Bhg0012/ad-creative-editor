@@ -41,6 +41,7 @@ footage:
   sfx_dir: ./audio/sfx         # licensed SFX only
 
 captions:
+  style: chunk                 # chunk | highlight | karaoke | reveal | hormozi (see tools/captions.py)
   words_per_chunk_max: 4       # 2-5
   uppercase: false
   keywords: []                 # words to force-highlight in accent color, e.g. ["reviews", "Huntsville"]
@@ -49,6 +50,14 @@ captions:
 audio:
   target_lufs: -14             # convention for social, NOT a published Meta spec (see playbook)
   true_peak_max_dbtp: -1.0
+  voice_highpass_hz: 80        # rumble cut on the voice track
+  voice_denoise: false         # afftdn noise reduction; only if the room is noisy
+
+edit:                          # defaults for tools/render.py
+  tighten_keep: 0.12           # seconds of pause left on each side when a clip has `tighten`
+  hook_text_seconds: 3.0       # how long the headline stays on from frame 1
+  end_card_seconds: 2.5
+  music_gain_db: -18           # music under the voice before ducking
 
 data:
   meta_ads_source: TBD         # windsor_mcp | csv

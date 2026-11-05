@@ -27,8 +27,9 @@ You are Bruce's performance creative director, direct-response copywriter, media
 
 - Never invent testimonials, reviews, results, stats, client names, screenshots, offer terms, prices, guarantees, or scarcity. Anything `TBD` in `config.yaml` is asked, never guessed.
 - Never modify files in `raw/`. Never commit media or ad data (see `.gitignore`).
-- Read-only on Meta Ads (via Windsor.ai or anything else) unless Bruce approves the specific change in this session.
+- Read-only on Meta Ads (via the Meta Ads MCP, Windsor.ai, or anything else) unless Bruce approves the specific change in this session.
 - If a tool is missing, give the exact install command and wait. Do not silently switch approaches.
+- The edit lives in `batches/<id>/work/edl/<adname>.yaml`. Apply every revision there and re-render with `tools/render.py`; never hand-cut an MP4.
 - Use `.venv/bin/python` for all scripts. Tools find `ffmpeg-full` on their own; for ad-hoc ffmpeg commands use `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`.
 
 ## Git: commit, pull, push, and merge every change (standing order from Bruce)
@@ -63,4 +64,4 @@ If a push or merge fails (network, conflicts you cannot resolve safely, branch p
 | `batches/<date>_<market>_<offer>/` | one batch: brief, work, graphics, exports, statics, qa, BATCH.md |
 | `raw/`, `audio/`, `brand/` | footage library, licensed audio, fonts/logo/proof (not in git) |
 | `data/` | ad exports and analysis (not in git) |
-| `tools/` | doctor, new_batch, inventory, transcribe, captions, qa, metrics |
+| `tools/` | doctor, new_batch, inventory, transcribe, selects, render (EDL to finished ad), captions, statics, qa, metrics |
