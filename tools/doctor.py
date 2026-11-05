@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, find_tool, load_yaml, missing_filters  # noqa: E402
+from common import ROOT, find_font, find_tool, load_yaml, missing_filters  # noqa: E402
 
 IS_APPLE_SILICON = sys.platform == "darwin" and platform.machine() == "arm64"
 
@@ -25,12 +25,17 @@ PY_PACKAGES = [
     ("pandas", "pandas", True),
     ("matplotlib", "matplotlib", True),
     ("numpy", "numpy", True),
-    ("mlx_whisper", "mlx-whisper", IS_APPLE_SILICON),
-    ("scenedetect", "scenedetect[opencv]", False),
+    ("PIL", "pillow", True),
+    ("cv2", "opencv-python", True),
+    ("mlx_whisper", "mlx-whisper", False),
+    ("whisperx", "whisperx", False),
+    ("faster_whisper", "faster-whisper", False),
+    ("scenedetect", "scenedetect", False),
     ("librosa", "librosa", False),
     ("auto_editor", "auto-editor", False),
     ("jupyter", "jupyter", False),
 ]
+TRANSCRIBERS = ["mlx_whisper", "whisperx", "faster_whisper", "whisper"]
 
 
 def check_tools() -> list[str]:
@@ -54,6 +59,17 @@ def check_tools() -> list[str]:
         print(f"  python {pip_name}: {'ok' if ok else 'missing'}{'' if required else ' (optional)'}")
         if not ok and required:
             problems.append(f"python package {pip_name} missing -> .venv/bin/pip install -r requirements.txt")
+    if not any(importlib.util.find_spec(m) for m in TRANSCRIBERS):
+        hint = ".venv/bin/pip install mlx-whisper" if IS_APPLE_SILICON else ".venv/bin/pip install faster-whisper"
+        problems.append(f"no transcription backend (mlx-whisper / whisperx / faster-whisper / whisper) -> {hint}")
+    cfg = load_yaml(ROOT / "config.yaml")
+    font_name = (cfg.get("business") or {}).get("caption_font_name") or "Montserrat ExtraBold"
+    font, exact = find_font(font_name)
+    print(f"  caption font {font_name!r}: {'ok ' + font if exact else 'NOT in brand/fonts' + (f' (fallback {font})' if font else '')}")
+    if not exact:
+        problems.append(f"put the licensed {font_name} .ttf/.otf in brand/fonts/ (captions and headlines fall back to another font until then)")
+    model = ROOT / "tools" / "models" / "face_detection_yunet_2023mar.onnx"
+    print(f"  face detector model: {'ok' if model.exists() else 'missing (render focus:auto falls back to center)'}")
     node = shutil.which("node")
     print(f"  node (for optional Remotion graphics): {node or 'missing (optional) -> brew install node'}")
     return problems

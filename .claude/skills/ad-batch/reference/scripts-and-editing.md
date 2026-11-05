@@ -26,11 +26,28 @@ Script line format:
 - Speaker's face on screen in the hook and the CTA.
 - Final 2-3s: CTA card in brand colors with the exact action ("Tap Learn More") and, if relevant, the local identifier ("Huntsville contractors"). The card's text sits inside the safe zone.
 
+## The EDL is the edit
+
+Every ad is described by `work/edl/<adname>.yaml` (print a template with `tools/render.py --example`). The render engine turns it into a finished file; Bruce's notes are applied by changing the EDL and re-rendering, so nothing is ever re-cut by hand and every version is a small diff. Fields:
+
+| Key | What it does |
+|---|---|
+| `clips[]` | A-roll in order: `src`, `in`, `out` (seconds in the source); `zoom` (static punch-in, 1.05-1.15), `push` (slow push to this factor), `focus: auto` (face-centered reframe) or `[x, y]`, `tighten: 0.45` (shorten internal pauses longer than 0.45s, leaving 0.12s each side). A still image takes `duration` instead of in/out. |
+| `broll[]` | Picture-only overlays: `src`, `at`, `duration`, `src_in`, optional `label` text. The voice keeps playing. |
+| `hook_text`, `hook_text_seconds` | Headline from frame 1, inside the top safe zone, with a dark box. Max about 7 words. |
+| `lower_third` | `text`, `at`, `duration`: name + "Auburn, AL" in the accent color, above the caption band. |
+| `music` | `src`, `gain_db` (default -18), `duck: true` (sidechain under the voice), `fade_out`. Loops if shorter than the ad. |
+| `sfx[]` | `src`, `at`, `gain_db`. |
+| `end_card` | `text`, `subtext`, `seconds`, `logo`: brand-primary card with the exact CTA. |
+
+The output sidecar `exports/<adname>.render.json` lists where every clip, overlay, and graphic landed on the timeline.
+
 ## Captions
 
 - Burned in on every ad. Meta calls captions "recommended" and sound "strongly recommended": design for both sound off and sound on.
-- Pipeline: render the edit, run `tools/transcribe.py` on the rendered file, run `tools/captions.py <words.json> --size WxH --out <file>.ass`, then burn in with the `ass` filter. This keeps captions frame-accurate to the final timeline. Fix recurring transcription errors via `captions.fixes` in `config.yaml`, not by hand-editing.
-- Style (built into `captions.py`): bold sans, 2-5 words per chunk, max 2 lines, white with black outline and shadow, one keyword per chunk in accent `#E55B13` (forced keywords via `captions.keywords`), positioned above the bottom safe zone.
+- Pipeline: `tools/render.py` renders the master, `tools/transcribe.py` transcribes it, `tools/render.py --captions <words.json>` burns the captions. This keeps captions frame-accurate to the final timeline. Fix recurring transcription errors via `captions.fixes` in `config.yaml`, not by hand-editing. For the tightest word timing (karaoke styles) install WhisperX; mlx-whisper is fine for `chunk`.
+- Styles (`captions.style` in `config.yaml`, or `tools/captions.py --style`): `chunk` (2-5 words per page, one keyword in accent; the clean, trust-first default for older trade owners), `highlight` (same pages, the spoken word turns accent and pops), `karaoke` (accent fills each word as spoken), `reveal` (words appear one by one), `hormozi` (1-3 words, ALL CAPS, bigger, spoken word accent). No independent study shows one style wins; the mechanism that matters is word-timed, high-contrast, few words per page. Make one `hormozi` or `highlight` variant per batch and let hook and hold rates decide.
+- All styles: heavy sans (Montserrat ExtraBold), white with black outline and shadow, accent `#E55B13`, max 2 lines, positioned above the bottom safe zone.
 - Burn in with `ass=<file>.ass:fontsdir=brand/fonts`. Check the ffmpeg log for `fontselect` fallback warnings and look at a frame: if the brand font did not load, libass silently substitutes another font.
 - Headline text hook visible on frame 1, not after a fade-in.
 - Caption and headline must never overlap each other; move the headline up if needed.
@@ -46,7 +63,7 @@ Script line format:
 
 ## Motion graphics
 
-Default: ffmpeg overlays (`drawtext`, `drawbox`, `overlay` of PNGs made from the brand kit) for simple elements. For animated counters, review cards, phone mockups, draw-on arrows, before/after splits, and lower thirds, use Remotion in `graphics/` (Node/React; Remotion's license is free for individuals and companies of up to 3 people; confirm at remotion.dev before using it if AuburnSEO grows past that). Keep one reusable composition per graphic type so later batches reuse them.
+Default: what `tools/render.py` draws (hook headline, B-roll label, lower third, end card) plus `overlay` of PNGs made from the brand kit. For animated counters, review cards, phone mockups, draw-on arrows, before/after splits, and lower thirds, use Remotion in `graphics/` (Node/React; Remotion's license is free for individuals and companies of up to 3 people; confirm at remotion.dev before using it if AuburnSEO grows past that). Keep one reusable composition per graphic type so later batches reuse them.
 
 - Brand colors `#3B96F6` / `#E55B13`. Motion 150-300ms ease-out. Every graphic readable in under 1 second.
 - Stat counters: only real numbers with a source shown.
@@ -64,7 +81,7 @@ Default: ffmpeg overlays (`drawtext`, `drawbox`, `overlay` of PNGs made from the
 
 ## Render settings (finals)
 
-Use the ffmpeg at `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`.
+`tools/render.py` applies all of this. For ad-hoc work use the ffmpeg at `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`.
 
 ```
 -c:v libx264 -preset slow -crf 18 -profile:v high -pix_fmt yuv420p -r <source fps, constant>

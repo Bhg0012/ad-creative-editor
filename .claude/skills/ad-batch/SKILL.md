@@ -30,7 +30,7 @@ Goal: know the market today, not as of training data.
 
 **1a. Best practices.** Start from `playbook/facts.yaml` (already verified and dated). Then search the web for anything from the last 3 months that changes or adds to it, focused on: creative diversity and delivery, Reels/Feed specs and safe zones, hook/pacing/caption trends in local-service and B2B-to-small-business ads (DTC ecommerce only if clearly transferable), lead-gen form and lead-quality changes, and policy changes. Write `brief/01_research.md` with a source and date on every claim; flag anything older than 12 months as possibly stale. Any new durable fact also goes into `playbook/facts.yaml` with the same fields as the others.
 
-**1b. Competitor and swipe research.** Use Claude in Chrome (start Claude Code with `claude --chrome`, or run `/chrome` in the session; needs the Claude in Chrome extension in Google Chrome) to open the Meta Ad Library (facebook.com/ads/library, country United States, ad category All ads). If the browser is not connected, ask Bruce to connect it or to drop Ad Library screenshots into `brief/swipe/`; do not invent ads. Search:
+**1b. Competitor and swipe research.** First choice: the Meta Ads MCP, if its tools are available in the session (`ads_library_search`, read-only). Search the Ad Library with `countries: ["US"]`, `ad_active_status: ACTIVE`, and the terms below; note each ad's creation date (age in days), page name, creative text, and `ad_snapshot_url`, and drop the snapshot links into `brief/02_swipe.md` so Bruce can open them. Second choice: Claude in Chrome (start Claude Code with `claude --chrome`, or run `/chrome`) on facebook.com/ads/library (country United States, All ads). If neither is connected, ask Bruce to connect one or to drop Ad Library screenshots into `brief/swipe/`; do not invent ads. Search:
 - agencies selling the same offer type to contractors ("review management for contractors", "contractor websites", "home service marketing", "GoHighLevel agency", "more Google reviews")
 - local competitors in the batch's market
 - big national players in the space
@@ -41,7 +41,7 @@ Longevity is the signal: an ad still active 30+ days after its "Started running 
 
 Then list **gaps**: angles nobody in this market uses, and claims everybody makes (now invisible).
 
-**1c. Bruce's own data.** If the Windsor.ai MCP is connected, pull all past Meta ads (discover field names with its field-listing tool; you need ad name, spend, impressions, 3-second video plays, ThruPlays, average watch time, link clicks, leads, frequency) and save as CSV in `data/`. Otherwise read CSV exports in `data/`. Run `.venv/bin/python tools/metrics.py <csv> --target-cpl <config target_cpl> --out data/analysis_<date>` and go deeper in `data/analysis.ipynb` (pandas, seaborn) if useful. Identify best and worst ads by CPL (flag low samples), whether hook or hold is the bottleneck, and which angles, hooks, and lengths correlate with better results. State sample-size caveats; do not over-fit a handful of ads. Summarize in `brief/03_my_data.md`. No data yet? Say so and move on.
+**1c. Bruce's own data.** First choice: the Meta Ads MCP (read-only): `ads_get_ad_accounts`, then `ads_get_ad_entities` at `level: ad` with `reporting_purpose: ["creative"]` and a `time_range` covering past batches (verify field names with `ads_get_field_context`; you need ad name, spend, impressions, 3-second video plays, ThruPlays, average watch time, link clicks, leads, frequency). Save the rows as a CSV in `data/`. Second choice: the Windsor.ai MCP. Otherwise read CSV exports in `data/`. Run `.venv/bin/python tools/metrics.py <csv> --target-cpl <config target_cpl> --out data/analysis_<date>` and go deeper in `data/analysis.ipynb` (pandas, seaborn) if useful. Identify best and worst ads by CPL (flag low samples), whether hook or hold is the bottleneck, and which angles, hooks, and lengths correlate with better results. State sample-size caveats; do not over-fit a handful of ads. Summarize in `brief/03_my_data.md`. No data yet? Say so and move on.
 
 **GATE 1:** one page: top 5 current findings, top 5 competitor patterns, the gaps, what Bruce's data says.
 
@@ -92,27 +92,33 @@ Size the batch to the budget: each live ad needs enough spend to be judged (see 
 
 ## Stage 5: ingest and rough cut
 
-1. **Inventory:** `.venv/bin/python tools/inventory.py --raw raw --out work/inventory.csv`. Note flags (variable frame rate, HDR, below 1080p) and handle them in the edit (convert VFR to constant, HDR to SDR).
-2. **Transcribe:** `.venv/bin/python tools/transcribe.py raw/<files> --out work/transcripts` (word-level JSON + SRT + TXT). Check low-confidence words by ear.
+1. **Inventory:** `.venv/bin/python tools/inventory.py --raw raw --out work/inventory.csv`. Note flags (variable frame rate, HDR, below 1080p); `tools/render.py` converts VFR to constant and HDR to SDR per clip, so just know which clips are soft.
+2. **Transcribe:** `.venv/bin/python tools/transcribe.py raw/<files> --out work/transcripts` (word-level JSON + SRT + TXT; picks mlx-whisper, WhisperX, or faster-whisper, whichever is installed). Check low-confidence words by ear.
 3. **Look at the footage:** contact sheets (1 frame per 2s) into `work/`, then view them. Tag each clip: framing, setting, energy, problems (blur, bad light, wind noise).
-4. **Selects (`work/selects.md`):** best take per script line: correct words, best delivery, no stumbles. Energy and clarity over perfection.
-5. **Cut list per ad (`work/cuts/<ad>.csv`):** source file, in, out, purpose. Remove dead air, breaths between sentences, ums, restarts. Trim gaps, not words; never speed up speech.
-6. **Rough cut proxies:** low-res, no graphics, burned-in timecode, in `work/proxies/`.
+4. **Selects:** `.venv/bin/python tools/selects.py --script brief/08_scripts.md --transcripts work/transcripts --out work/selects.md --edl work/edl/<adname>.yaml --name <adname>` finds the best take per script line (top 3 candidates with scores) and writes a draft EDL. Lines reported NOT FOUND need filming or rewriting. Pick takes on correct words, best delivery, no stumbles; energy and clarity over perfection.
+5. **EDL per ad (`work/edl/<adname>.yaml`):** the single source of truth for the cut (see `tools/render.py --example`): A-roll clips with in/out, `zoom` or `push`, `tighten` to shorten pauses (gaps, never words), B-roll windows, hook text, lower third, music, SFX, end card. Every later revision edits this file, never the MP4. Remove dead air, breaths between sentences, ums, restarts. Never speed up speech.
+6. **Rough cut proxies:** `.venv/bin/python tools/render.py work/edl/<adname>.yaml --proxy` (540 px, timecode burned, no music or graphics) into `work/proxies/`.
 
-**GATE 5:** rough cuts plus cut lists. Apply every note; log each in `LEARNINGS.md`.
+**GATE 5:** proxies plus EDLs. Apply every note by editing the EDL and re-rendering the proxy; log each note in `LEARNINGS.md`.
 
 ## Stage 6: full edit
 
-Follow `reference/scripts-and-editing.md` for cadence, captions, graphics, sound, and render settings. Key points:
-- Pattern interrupt every 2-4s in the first 10s; B-roll shows what the VO says; face on screen in hook and CTA.
-- Captions are generated from a transcript of the final cut (`tools/transcribe.py` then `tools/captions.py`), never retyped.
-- Every text element inside the safe zone for its ratio.
+Follow `reference/scripts-and-editing.md` for cadence, captions, graphics, sound, and render settings. The render is three commands per ad:
+
+1. `.venv/bin/python tools/render.py work/edl/<adname>.yaml` renders `work/cuts/<adname>_master.mp4` (reframed, graded, B-roll, hook text, lower third, music ducked under the voice, SFX, two-pass loudness) with no captions yet.
+2. `.venv/bin/python tools/transcribe.py work/cuts/<adname>_master.mp4 --out work/transcripts` (or add `--captions auto` to step 1 when a backend is installed).
+3. `.venv/bin/python tools/render.py work/edl/<adname>.yaml --captions work/transcripts/<adname>_master.words.json` burns captions in the style from `config.yaml` (`captions.style`) and writes `exports/<adname>.mp4` plus `exports/<adname>.render.json` (the timeline sidecar for QA and DECISIONS).
+
+Key points:
+- Pattern interrupt every 2-4s in the first 10s (alternate `zoom: 1.0` and `zoom: 1.08-1.12`, B-roll, text); B-roll shows what the VO says; face on screen in hook and CTA.
+- Captions are generated from a transcript of the final master, never retyped. Default style `chunk` for this ICP; make one variant per batch in `hormozi` or `highlight` style and let the data decide.
+- Every text element inside the safe zone for its ratio (render.py places them there; QA still checks).
 - Mix to the loudness target in `config.yaml`, verified by `tools/qa.py`.
 - Must make complete sense with sound off, and with eyes closed.
 
-**Variants:** after the hero is approved, make variants that are meaningfully different: (1) different visual hook (shot, setting, format), not just different text; (2) different length (15s cut-down); (3) different format (talking head vs screen-recording-led vs text on B-roll vs static); (4) aspect ratios (9:16 primary, 4:5 for Feed) reframed to keep face and text in frame, never letterboxed. Label each as `new` or `iteration` in `DECISIONS.md`.
+**Variants:** after the hero is approved, make variants that are meaningfully different: (1) different visual hook (shot, setting, format), not just different text; (2) different length (15s cut-down); (3) different format (talking head vs screen-recording-led vs text on B-roll vs static); (4) aspect ratios: `tools/render.py <edl> --ratio 4:5 --captions ...` reframes the same EDL for Feed around the speaker's face (`focus: auto`), never letterboxed. Label each as `new` or `iteration` in `DECISIONS.md`.
 
-**Statics** (if `also_make_statics`): 2-3 per batch from strong frames or real proof screenshots, 1440x1800 (4:5) and 1440x2560 (9:16), headline inside the safe zone, one message, one CTA.
+**Statics** (if `also_make_statics`): 2-3 per batch with `.venv/bin/python tools/statics.py --image <real photo or proof screenshot> | --frame-from <master.mp4> --at <s> --headline "..." --sub "..." --cta "Tap Learn More" --ratio 4:5 --out statics/<name>_4x5_v1.png` (and `--ratio 9:16`). One message, one CTA, headline inside the safe zone.
 
 **GATE 6:** the first full-quality hero ad, before any variants. Apply notes, log them, then produce the rest.
 
@@ -122,7 +128,7 @@ For every ad, write `exports/<adname>_copy.md` per `reference/copy-package.md`. 
 
 ## Stage 8: QA (before Bruce sees anything)
 
-1. Run `.venv/bin/python tools/qa.py exports/*.mp4 --qa-dir qa`. It checks specs, loudness, black frames, silent openings, and opening similarity, and writes evidence images.
+1. Run `.venv/bin/python tools/qa.py exports/*.mp4 --qa-dir qa`. It checks specs, loudness, black frames, silent openings, and opening similarity, and writes evidence images. Read each ad's `exports/<adname>.render.json` to know what should be on screen when.
 2. Open and look at every evidence image: contact sheet, first frame (would it stop a scroll as a still?), safe-zone frames, mobile 360px frames.
 3. Diff burned-in captions against the transcript; spell-check and fact-check every on-screen word.
 4. Run the compliance checklist from `reference/compliance.md` line by line, per ad.

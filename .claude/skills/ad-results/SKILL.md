@@ -7,7 +7,7 @@ description: Analyze live Meta ad results for AuburnSEO, diagnose each ad (openi
 
 ## Steps
 
-1. **Get the data.** If the Windsor.ai MCP is connected, pull Meta Ads data at ad level for the batch's date range (ad name, spend, impressions, 3-second video plays, ThruPlays, average watch time, link clicks, leads, frequency; list available fields first to get exact names) and save it as `data/<batch id>_<date>.csv`. Otherwise ask Bruce for an Ads Manager CSV export at ad level with those columns. Read-only: never change anything in Ads Manager without Bruce approving the specific change.
+1. **Get the data.** If the Meta Ads MCP is connected (`ads_get_ad_accounts`, then `ads_get_ad_entities` at `level: ad`, `reporting_purpose: ["creative"]`, with a `time_range`; verify field names with `ads_get_field_context`), pull ad-level rows and save them as `data/<batch id>_<date>.csv`. Else if the Windsor.ai MCP is connected, pull Meta Ads data at ad level for the batch's date range (ad name, spend, impressions, 3-second video plays, ThruPlays, average watch time, link clicks, leads, frequency; list available fields first to get exact names) and save it as `data/<batch id>_<date>.csv`. Otherwise ask Bruce for an Ads Manager CSV export at ad level with those columns. Read-only: never change anything in Ads Manager without Bruce approving the specific change.
 2. **Lead quality.** Ask Bruce (or pull from the CRM if connected) how many leads per ad qualified, booked, and closed. CPL without lead quality is misleading.
 3. **Compute.** Run `.venv/bin/python tools/metrics.py <csv> --target-cpl <target> --out data/analysis_<batch id>_<date>`. Read `ad_metrics.md`. Go deeper in a notebook in `data/` if needed (pandas, seaborn), e.g. trends by day or frequency.
 4. **Diagnose each ad** against the account's own medians first and playbook benchmarks second (playbook `hook_hold_benchmarks`):
@@ -15,7 +15,7 @@ description: Analyze live Meta ad results for AuburnSEO, diagnose each ad (openi
    - good hook, low hold -> body and pacing
    - good hold, low CTR -> offer and CTA
    - good CTR, bad CPL or lead quality -> form, landing page, follow-up speed, audience
-   Respect the verdicts' spend thresholds; call out anything judged on a low sample.
+   Respect the verdicts' spend thresholds; call out anything judged on a low sample. Fatigue check (playbook `creative_fatigue`): CTR down about 15% over 14 days with frequency above about 2.5 means refresh the creative before CPL climbs.
 5. **Hit rate:** winners / ads tested for the batch, and the running hit rate across batches.
 6. **Write to `LEARNINGS.md`:** winners' patterns and losers' patterns (angle, hook type, opening shot type, length, format, caption style, music energy), each with the evidence and its sample size. Promote a pattern to "Rules in force" only after it holds across at least two batches or a clearly significant result.
 7. **Recommend actions** for live ads (pause, keep, raise budget, duplicate into a new test) and wait for Bruce's approval of each specific change.
