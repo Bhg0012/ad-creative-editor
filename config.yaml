@@ -42,7 +42,8 @@ footage:
 
 captions:
   engine: html                 # html = browser-rendered word captions (pill, highlight, clean); ass = libass (chunk, highlight, karaoke, reveal, hormozi)
-  style: pill                  # html: pill | highlight | clean. ass: chunk | highlight | karaoke | reveal | hormozi
+  style: pill                  # html: pill | highlight | clean | box. ass: chunk | highlight | karaoke | reveal | hormozi
+  font_name:                   # optional caption-only font family from brand/fonts (e.g. "Anton" for the condensed box look); empty = brand font
   words_per_chunk_max: 4       # 2-5
   uppercase: false
   keywords: []                 # words to force-highlight in accent color, e.g. ["reviews", "Huntsville"]

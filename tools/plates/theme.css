@@ -1,8 +1,10 @@
 /* Design system for every motion plate. Edit here, every graphic follows. */
 @font-face { font-family: "Brand"; src: url("{{font_url}}"); font-weight: 800; }
 @font-face { font-family: "Brand"; src: url("{{font_bold_url}}"); font-weight: 700; }
+@font-face { font-family: "Caption"; src: url("{{caption_font_url}}"); font-weight: 400 900; }
 :root {
   --font: "Brand", "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  --caption-font: "Caption", "Brand", "Montserrat", sans-serif;   /* config captions.font_name, else the brand font */
   --primary: {{primary}};
   --accent: {{accent}};
   --ink: #0f1115;

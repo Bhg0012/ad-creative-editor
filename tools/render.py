@@ -79,6 +79,7 @@ clips:                        # A-roll in timeline order; in/out are seconds in 
   - {src: raw/screenshot.png, duration: 2.5, push: 1.12}    # still image, Ken Burns push
 broll:                        # picture-only overlays on the timeline; the voice continues
   - {src: raw/phone_text.mov, at: 6.0, duration: 2.5, src_in: 0.0, label: "A text goes out"}
+  - {src: raw/screen_recording.mov, at: 9.0, duration: 4.0, speaker_inset: {w: 0.40, x: 0.76, y: 0.70}}  # screen full frame, speaker in a corner inset
   - {src: raw/review_screenshot.heic, at: 14.0, duration: 2.0, pip: {w: 0.72, x: 0.5, y: 0.40}}  # picture-in-picture
 callouts:                     # short on-screen text mid-video: a number, a re-hook, a label (rendered as animated cards)
   - {text: "$4,800 roof job (example)", at: 9.0, duration: 2.0, position: center, accent: true}
@@ -541,6 +542,23 @@ def plate_specs(edl: dict, cfg: dict) -> list[dict]:
     return sorted(specs, key=lambda x: (float(x["at"]), x["type"] != "hook"))
 
 
+def rounded_mask_and_shadow(w: int, h: int, radius: int, tmp: Path, tag: str) -> tuple[Path, Path, int]:
+    """A rounded-rectangle alpha mask for an inset and a soft shadow PNG (returns mask, shadow, shadow padding)."""
+    from PIL import Image, ImageDraw, ImageFilter
+
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
+    mask_p = tmp / f"mask_{tag}.png"
+    mask.save(mask_p)
+    pad = max(24, radius)
+    sh = Image.new("RGBA", (w + 2 * pad, h + 2 * pad), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle((pad, pad + pad // 3, pad + w - 1, pad + h - 1 + pad // 3), radius=radius, fill=(0, 0, 0, 150))
+    sh = sh.filter(ImageFilter.GaussianBlur(pad / 2))
+    sh_p = tmp / f"shadow_{tag}.png"
+    sh.save(sh_p)
+    return mask_p, sh_p, pad
+
+
 # ---------- composite ----------
 
 def drawtext_block(font: str, textfile: Path, size: int, color: str, y_expr: str, start: float, end: float,
@@ -587,6 +605,11 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
                             "duration": total, "clips": edl["_timeline_clips"], "broll": [], "graphics": []}
     idx = 1
     cur = "[0:v]"
+    n_insets = sum(1 for b in (edl.get("broll") or []) if b.get("speaker_inset") and not b.get("pip"))
+    if n_insets:
+        vchain.append(f"[0:v]split={n_insets + 1}[a0]" + "".join(f"[spk{i}]" for i in range(n_insets)))
+        cur = "[a0]"
+    inset_i = 0
     # B-roll overlays (picture only)
     use_html = (not proxy) and plates_available(cfg)
     for b in edl.get("broll") or []:
@@ -600,25 +623,53 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
                 "zoom": b.get("zoom") or 1.0, "push": b.get("push")}
         src_in = float(b.get("src_in") or 0.0)
         pip = b.get("pip")
+        win = f"enable='between(t,{at:.3f},{at + dur:.3f})'"
+        k = idx   # label of this B-roll's output; extra mask/shadow inputs bump idx below
         if pip:
-            # Picture-in-picture: keep the B-roll's own shape, scale to a fraction of the frame width.
+            # Picture-in-picture video: rounded corners and a soft shadow (no hard border), scaled to a fraction of the width.
             bw, bh = display_size(b["vstream"])
             pw = even(out_w * float(pip.get("w") or 0.7))
             ph = even(pw * bh / bw)
             render_segment({**clip, "focus": None}, src_in, src_in + dur, seg, ratio_of_size(pw, ph), pw, ph, fps,
                            ENC_INTER, (0.5, 0.5))
-            border = max(2, round(out_w * 0.004))
             cx, cy = float(pip.get("x") or 0.5), float(pip.get("y") or 0.40)
-            px, py = even(cx * out_w - (pw + 2 * border) / 2), even(cy * out_h - (ph + 2 * border) / 2)
-            vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB,pad=iw+{2 * border}:ih+{2 * border}:{border}:{border}:color=white[b{idx}]")
-            vchain.append(f"{cur}[b{idx}]overlay=x={px}:y={py}:eof_action=pass:enable='between(t,{at:.3f},{at + dur:.3f})'[v{idx}]")
+            px, py = even(cx * out_w - pw / 2), even(cy * out_h - ph / 2)
+            mask_p, sh_p, pad = rounded_mask_and_shadow(pw, ph, round(out_w * 0.035), tmp, f"pip{idx}")
+            inputs += ["-i", str(seg), "-loop", "1", "-i", str(mask_p), "-loop", "1", "-i", str(sh_p)]
+            vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB,format=rgba[bv{idx}]")
+            vchain.append(f"[{idx + 1}:v]format=gray[bm{idx}]")
+            vchain.append(f"[bv{idx}][bm{idx}]alphamerge[br{idx}]")
+            vchain.append(f"{cur}[{idx + 2}:v]overlay=x={px - pad}:y={py - pad}:{win}[bs{idx}]")
+            vchain.append(f"[bs{idx}][br{idx}]overlay=x={px}:y={py}:eof_action=pass:{win}[v{idx}]")
+            idx += 2
         else:
             render_segment(clip, src_in, src_in + dur, seg, ratio, out_w, out_h, fps, ENC_INTER, (0.5, 0.5))
+            inputs += ["-i", str(seg)]
             vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB[b{idx}]")
-            vchain.append(f"{cur}[b{idx}]overlay=eof_action=pass:enable='between(t,{at:.3f},{at + dur:.3f})'[v{idx}]")
-        inputs += ["-i", str(seg)]
-        cur = f"[v{idx}]"
-        timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label"), "pip": bool(pip)})
+            vchain.append(f"{cur}[b{idx}]overlay=eof_action=pass:{win}[v{idx}]")
+        cur = f"[v{k}]"
+        ins = b.get("speaker_inset")
+        if ins and not pip:
+            # The screen is the set: full-frame B-roll with the speaker kept in a rounded inset in a corner
+            # (reference: creator ads, Nov 2026). Taken from the A-roll itself, so lip sync is untouched.
+            # Default: 40% wide, lower right, bottom edge 10% off the frame bottom (face lands near 60% height).
+            iw_ = even(out_w * float(ins.get("w") or 0.40))
+            ih_ = even(iw_ * out_h / out_w)
+            cx, cy = float(ins.get("x") or 0.76), float(ins.get("y") or 0.70)
+            px, py = even(cx * out_w - iw_ / 2), even(cy * out_h - ih_ / 2)
+            mask_p, sh_p, pad = rounded_mask_and_shadow(iw_, ih_, round(out_w * 0.035), tmp, f"spk{idx}")
+            inputs += ["-loop", "1", "-i", str(mask_p), "-loop", "1", "-i", str(sh_p)]
+            vchain.append(f"[spk{inset_i}]scale={iw_}:{ih_},format=rgba[sp{idx}]")
+            inset_i += 1
+            vchain.append(f"[{idx + 1}:v]format=gray[sm{idx}]")
+            vchain.append(f"[sp{idx}][sm{idx}]alphamerge[sr{idx}]")
+            vchain.append(f"{cur}[{idx + 2}:v]overlay=x={px - pad}:y={py - pad}:{win}[ss{idx}]")
+            vchain.append(f"[ss{idx}][sr{idx}]overlay=x={px}:y={py}:{win}[sv{idx}]")
+            cur = f"[sv{idx}]"
+            idx += 2
+            b["_inset_done"] = True
+        timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label"), "pip": bool(pip),
+                                  "speaker_inset": bool(b.get("_inset_done"))})
         if b.get("label") and not proxy:
             lf = tmp / f"broll_label_{idx}.txt"
             lf.write_text(wrap_text(str(b["label"]), 22))
@@ -801,7 +852,7 @@ def build_captions(words_json: Path, out_w: int, out_h: int, ass_out: Path, cfg:
 
 
 ASS_STYLES = {"chunk", "highlight", "karaoke", "reveal", "hormozi"}
-HTML_STYLES = {"pill", "highlight", "clean"}
+HTML_STYLES = {"pill", "highlight", "clean", "box"}
 
 
 def build_caption_plate(words_json: Path, out_w: int, out_h: int, total: float, fps: int, out: Path, cfg: dict, edl: dict) -> list[dict]:

@@ -309,7 +309,8 @@ clips:
   - {src: raw/landscape.mp4, in: 5.0, out: 6.0, push: 1.08}
   - {src: raw/still.png, duration: 1.0, push: 1.1}
 broll:
-  - {src: raw/broll.mp4, at: 1.0, duration: 1.0, label: "A text goes out"}
+  - {src: raw/broll.mp4, at: 0.25, duration: 0.5, src_in: 1.0, pip: {w: 0.5, x: 0.5, y: 0.40}}
+  - {src: raw/broll.mp4, at: 1.0, duration: 1.0, label: "A text goes out", speaker_inset: {w: 0.40, x: 0.76, y: 0.70}}
   - {src: raw/photo.heic, at: 5.6, duration: 0.8, pip: {w: 0.6, x: 0.5, y: 0.4}}
 callouts:
   - {text: "$4,800 job (example)", at: 3.0, duration: 1.0, accent: true}
@@ -374,18 +375,21 @@ def test_render_proxy_and_final(footage):
     dur = float(info["format"]["duration"])
     # 2.0 + (4.0 tightened to ~3.24) + 1.0 + 1.0 + end card 1.5 = about 8.7 s
     assert 8.2 < dur < 9.2, dur
-    r, g, b = mean_rgb(final, 1.5)       # inside the green B-roll window (ffmpeg green is 0x008000)
+    r, g, b = mean_rgb(final, 1.5, "crop=iw*0.4:ih*0.3:iw*0.05:ih*0.4")   # left half of the green B-roll window (0x008000)
     assert g > 90 and g > 2 * r and g > 2 * b, (r, g, b)
+    r, g, b = mean_rgb(final, 1.5, "crop=iw*0.3:ih*0.12:iw*0.62:ih*0.60")   # the speaker inset is A-roll, not green
+    assert not (g > 90 and g > 2 * r and g > 2 * b), (r, g, b)
     r, g, b = mean_rgb(final, 2.6)       # back on A-roll (testsrc2 is not green)
     assert not (g > 90 and g > 2 * r and g > 2 * b), (r, g, b)
     sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
     assert [c["src"] for c in sidecar["clips"]][-1] == "end_card"
-    assert sidecar["broll"][0]["at"] == 1.0 and sidecar["graphics"][0]["type"] in ("hook_text", "hook")
+    assert sidecar["broll"][1]["at"] == 1.0 and sidecar["graphics"][0]["type"] in ("hook_text", "hook")
+    assert sidecar["broll"][1].get("speaker_inset") is True and sidecar["broll"][0]["pip"] is True
     assert len(sidecar["clips"]) == 6  # the tightened clip became two segments
     assert [g["type"] for g in sidecar["graphics"]] == ["hook", "lower_third", "label", "compare", "pip", "stat"]
     assert all(g["engine"] == "html" for g in sidecar["graphics"])
     assert sidecar["captions"]["engine"] == "html" and sidecar["captions"]["style"] == "pill"
-    assert sidecar["broll"][1]["pip"] is True
+    assert sidecar["broll"][2]["pip"] is True
     r, g, b = mean_rgb(final, 5.9, "crop=iw*0.3:ih*0.1:iw*0.35:ih*0.37")   # inside the pip plate of the red HEIC photo
     assert r > 120 and r > 2 * g and r > 2 * b, (r, g, b)
     s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
@@ -638,3 +642,10 @@ def test_qa_flags_overlapping_graphics():
     sc["graphics"][1]["at"] = 4.5
     s = {c["check"]: c["status"] for c in qa.sidecar_checks(sc, 20.0)}
     assert s["one graphic per region at a time"] == "PASS"
+
+
+def test_caption_box_style_builds(footage):
+    cfg = common.load_config()
+    spec = {"type": "captions", "words": WORDS, "style": "box", "keywords": ["reviews."], "max_words": 3, "duration": 5}
+    h = plates.build_html(spec, 540, 960, cfg)
+    assert "style-box" in h and h.count('class="w on key"') >= 3
