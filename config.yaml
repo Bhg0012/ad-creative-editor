@@ -58,9 +58,15 @@ graphics:                      # motion plates (tools/plates.py), the browser-re
   engine: html                 # html = animated cards, callouts, lower third, hook, end card rendered in Chromium; ffmpeg = flat drawtext fallback
   auto_sfx: yes                # a pop / whoosh / click / ding on every graphic entrance, from audio/sfx/<name>.wav or synthesized defaults
   sfx_gain_db: -14
+  lead_s: 0.08                 # graphics and their sounds cue this many seconds before the word (anticipation, like a human cut)
 
-edit:                          # defaults for tools/render.py
-  tighten_keep: 0.12           # seconds of pause left on each side when a clip has `tighten`
+edit:                          # defaults for tools/render.py (what an editor does by reflex; per-clip keys override)
+  auto_tighten: 0.45           # shorten every pause longer than this inside a clip; `tighten: 0` on a clip disables
+  tighten_keep: 0.12           # seconds of pause left on each side when a pause is tightened
+  auto_alternate_zoom: yes     # consecutive talking-head clips alternate 1.0 and alternate_zoom so jump cuts read as intended
+  alternate_zoom: 1.08
+  settle_cuts: 1.04            # every cut after the first opens pushed in by this and settles over 0.25 s; `settle: 0` on a clip disables
+  look: {contrast: 1.03, saturation: 1.06}   # light, consistent grade on A-roll; remove to pass footage through untouched
   hook_text_seconds: 3.0       # how long the headline stays on from frame 1
   end_card_seconds: 2.5
   music_gain_db: -18           # music under the voice before ducking

@@ -315,7 +315,7 @@ callouts:
   - {text: "$4,800 job (example)", at: 3.0, duration: 1.0, accent: true}
 plates:
   - {type: compare, title: "Same work.", left: {label: You, value: 9}, right: {label: Them, value: 140}, note: "(example)", at: 4.2, duration: 1.2}
-  - {type: stat, value: 140, suffix: " reviews", label: "(example)", at: 6.3, duration: 0.9}
+  - {type: stat, value: 140, suffix: " reviews", label: "(example)", at: 6.5, duration: 0.9}
 look: {contrast: 1.03, saturation: 1.05, sharpen: true}
 lower_third: {text: "Bruce, Auburn AL", at: 0.5, duration: 1.5}
 music: {src: audio/music.mp3, gain_db: -16, duck: true}
@@ -386,7 +386,7 @@ def test_render_proxy_and_final(footage):
     assert all(g["engine"] == "html" for g in sidecar["graphics"])
     assert sidecar["captions"]["engine"] == "html" and sidecar["captions"]["style"] == "pill"
     assert sidecar["broll"][1]["pip"] is True
-    r, g, b = mean_rgb(final, 6.0, "crop=iw*0.3:ih*0.1:iw*0.35:ih*0.37")   # inside the pip plate of the red HEIC photo
+    r, g, b = mean_rgb(final, 5.9, "crop=iw*0.3:ih*0.1:iw*0.35:ih*0.37")   # inside the pip plate of the red HEIC photo
     assert r > 120 and r > 2 * g and r > 2 * b, (r, g, b)
     s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
     assert s["flash frames (10 fps scan)"] == "PASS" and s["captions inside safe zone"] == "PASS"
@@ -614,3 +614,27 @@ def test_plates_render_alpha_and_storyboard(footage):
     sheet = render.storyboard(edl, None)
     from PIL import Image
     assert sheet.exists() and Image.open(sheet).size[0] > 1000
+
+
+def test_editor_defaults_alternate_tighten_settle():
+    cfg = {"edit": {"auto_tighten": 0.4, "auto_alternate_zoom": True, "alternate_zoom": 1.08, "settle_cuts": 1.04}}
+    edl = {"clips": [{"src": "a", "still": False}, {"src": "a", "still": False}, {"src": "img", "still": True},
+                     {"src": "a", "still": False, "zoom": 1.2, "tighten": 0, "settle": 0}, {"src": "a", "still": False}]}
+    render.apply_editor_defaults(edl, cfg)
+    c = edl["clips"]
+    assert [x.get("zoom") for x in c] == [1.0, 1.08, None, 1.2, 1.0]
+    assert c[0]["tighten"] == 0.4 and c[3]["tighten"] == 0 and "tighten" not in c[2]
+    assert "_settle" not in c[0] and c[1]["_settle"] == 1.04 and c[3]["_settle"] is None and c[4]["_settle"] == 1.04
+    vf = render.video_filters(1920, 1080, False, "9:16", 1080, 1920, 30, (0.5, 0.5), 1.0, None, 2.0, None, 1.04)
+    assert "eval=frame" in vf and "pow(" in vf
+
+
+def test_qa_flags_overlapping_graphics():
+    sc = {"graphics": [{"type": "label", "at": 2.0, "duration": 2.0, "region": "center"},
+                       {"type": "stat", "at": 3.0, "duration": 2.0, "region": "center"},
+                       {"type": "hook", "at": 0.0, "duration": 3.0, "region": "top"}], "clips": [{"src": "end_card"}]}
+    s = {c["check"]: c["status"] for c in qa.sidecar_checks(sc, 20.0)}
+    assert s["one graphic per region at a time"] == "FAIL"
+    sc["graphics"][1]["at"] = 4.5
+    s = {c["check"]: c["status"] for c in qa.sidecar_checks(sc, 20.0)}
+    assert s["one graphic per region at a time"] == "PASS"

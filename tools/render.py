@@ -229,6 +229,10 @@ def face_detector():
     except ImportError:
         return None
     if hasattr(cv2, "FaceDetectorYN") and YUNET.exists():
+        try:
+            cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)   # hide the "graph engine" notice
+        except AttributeError:
+            pass
         det = cv2.FaceDetectorYN.create(str(YUNET), "", (320, 320), 0.6, 0.3, 200)
 
         def yunet(img):
@@ -326,9 +330,12 @@ def look_filter(look: dict | None) -> str | None:
     return ",".join(parts) or None
 
 
+SETTLE_S = 0.25   # seconds a settle cut takes to come to rest
+
+
 def video_filters(src_w: int, src_h: int, hdr: bool, ratio: str, out_w: int, out_h: int, fps: int,
                   focus: tuple[float, float], zoom: float, push: float | None, duration: float,
-                  look: dict | None = None) -> str:
+                  look: dict | None = None, settle: float | None = None) -> str:
     f = []
     if hdr:
         f.append(HDR_TO_SDR)
@@ -339,6 +346,13 @@ def video_filters(src_w: int, src_h: int, hdr: bool, ratio: str, out_w: int, out
         # (zoompan on video input is slow and memory hungry; scale with eval=frame is cheap.)
         d = max(duration, 0.1)
         grow = f"(1+({push - 1:.4f})*min(t,{d:.3f})/{d:.3f})"
+        f.append(f"scale=w='trunc({out_w}*{grow}/2)*2':h='trunc({out_h}*{grow}/2)*2':eval=frame")
+        f.append(f"crop={out_w}:{out_h}:(iw-{out_w})/2:(ih-{out_h})/2")
+    elif settle and settle > 1.0:
+        # Settle cut: the clip opens pushed in by `settle` and eases back to its framing over SETTLE_S.
+        # Reads as a deliberate motion cut instead of a static jump, the way modern editors cut talking heads.
+        ease = f"(1-pow(1-min(t,{SETTLE_S})/{SETTLE_S},3))"   # cubic ease-out
+        grow = f"(1+({settle - 1:.4f})*(1-{ease}))"
         f.append(f"scale=w='trunc({out_w}*{grow}/2)*2':h='trunc({out_h}*{grow}/2)*2':eval=frame")
         f.append(f"crop={out_w}:{out_h}:(iw-{out_w})/2:(ih-{out_h})/2")
     else:
@@ -357,7 +371,7 @@ def render_segment(clip: dict, t_in: float, t_out: float, out: Path, ratio: str,
     src_w, src_h = display_size(v)
     dur = t_out - t_in
     vf = video_filters(src_w, src_h, is_hdr(v), ratio, out_w, out_h, fps, focus,
-                       float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"))
+                       float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"), clip.get("_settle"))
     if timecode_from is not None and font:
         vf += (f",drawtext=fontfile='{font}':text='%{{pts\\:hms\\:{timecode_from:.3f}}}':fontsize={max(18, out_h // 30)}:"
                f"fontcolor=white:box=1:boxcolor=black@0.6:x=10:y=10")
@@ -448,6 +462,37 @@ def duration_of(path: Path) -> float:
     return float(probe(path)["format"]["duration"])
 
 
+# ---------- editor defaults ----------
+
+def apply_editor_defaults(edl: dict, cfg: dict) -> None:
+    """What a trained editor does by reflex unless told otherwise (config `edit.*`, per-clip keys override):
+    alternate framing on consecutive talking-head clips, tighten every pause, settle every cut after the first."""
+    e = cfg.get("edit") or {}
+    clips = edl["clips"]
+    if e.get("auto_alternate_zoom", True):
+        last_zoom = None
+        for c in clips:
+            if c["still"] or "zoom" in c or c.get("push"):
+                last_zoom = None if c["still"] else float(c.get("zoom") or 1.0)
+                continue
+            c["zoom"] = float(e.get("alternate_zoom") or 1.08) if last_zoom == 1.0 else 1.0
+            last_zoom = c["zoom"]
+    auto_t = e.get("auto_tighten", 0.45)
+    if auto_t:
+        for c in clips:
+            if not c["still"] and "tighten" not in c:
+                c["tighten"] = float(auto_t)
+    settle = e.get("settle_cuts", 1.04)
+    if settle:
+        for n, c in enumerate(clips):
+            if n == 0 or c["still"] or c.get("push"):
+                continue
+            c["_settle"] = float(c["settle"]) if "settle" in c else float(settle)
+    for c in clips:
+        if c.get("settle") == 0:
+            c["_settle"] = None
+
+
 # ---------- motion plates (browser-rendered graphics) ----------
 
 def plates_available(cfg: dict) -> bool:
@@ -487,9 +532,12 @@ def plate_specs(edl: dict, cfg: dict) -> list[dict]:
         sp = dict(pl)
         sp.setdefault("duration", 2.5)
         specs.append(sp)
+    lead = float((cfg.get("graphics") or {}).get("lead_s") or 0.0)
     for sp in specs:
         if "at" not in sp:
             raise SystemExit(f"plate {sp.get('type')} needs `at`")
+        if lead and float(sp["at"]) > 0:
+            sp["at"] = round(max(0.0, float(sp["at"]) - lead), 3)   # cue graphics a few frames before the word
     return sorted(specs, key=lambda x: (float(x["at"]), x["type"] != "hook"))
 
 
@@ -801,6 +849,7 @@ def timeline_of(edl_path: Path, ratio: str | None = None) -> list[dict]:
     """
     cfg = load_config()
     edl = load_edl(edl_path, ratio)
+    apply_editor_defaults(edl, cfg)
     keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
     out, t = [], 0.0
     for c in edl["clips"]:
@@ -857,6 +906,7 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         segments, t = [], 0.0
         timeline_clips = []
         keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
+        apply_editor_defaults(edl, cfg)
         look = edl.get("look") or (cfg.get("edit") or {}).get("look")
         for n, c in enumerate(edl["clips"]):
             c["_look"] = None if c["still"] else look
