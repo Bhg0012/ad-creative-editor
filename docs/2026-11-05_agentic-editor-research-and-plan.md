@@ -112,6 +112,10 @@ Added, tested, and merged:
 | Per-clip contact sheets | `tools/inventory.py --sheets` | Read a whole take at a glance with timecodes, which is how B-roll gets tagged in Stage 5. |
 | Stricter QA | `tools/qa.py` | Caption geometry proven inside the safe zone with the real font metrics, caption vs lower third overlap, headline present on frame 1, a face in the hook and in the CTA, duration guidance, and `--script` checks every script line is heard. |
 | Review page | `tools/review.py` | One local HTML page per batch with players, timelines, captions, QA tables, copy, and a notes box per ad that copies back into the chat. Serve it with one command and review on the phone. |
+| Sample builder | `tools/make_sample.py` | Proves the whole pipeline on a fresh machine in about three minutes with no footage: synthesized voice (your Mac's `say`), placeholder takes in both orientations, mock B-roll, a stand-in proof image, music, SFX, captions, QA. |
+| Copy and caption linter | `tools/lint_copy.py` | Catches em dashes, jargon, personal-attribute wording, unproven claims, fake urgency, unlabeled numbers, and length limits in copy files, EDL texts and captions before anything reaches you. |
+| One-command ratios | `tools/render.py --all-ratios --captions auto` | Every ratio from one EDL, transcribed once, so Reels and Feed versions can never drift apart. |
+| Fatigue reads | `tools/metrics.py` | Reads a Meta Ads MCP JSON pull directly and flags ads whose link CTR fell 15% or more over the last 7 days with frequency above 2.5. |
 | Self-review loop in the skill | `.claude/skills/ad-batch/SKILL.md` Stage 6 | Render, look at the QA evidence, fix the EDL, re-render, up to three passes, before Bruce sees anything. |
 
 Test suite: 31 tests, including a full synthetic render with every feature above.

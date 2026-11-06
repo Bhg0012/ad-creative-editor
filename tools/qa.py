@@ -226,7 +226,12 @@ def caption_geometry(ass_path: Path, w: int, h: int, ratio: str, sidecar: dict) 
     lt = next((g for g in sidecar.get("graphics", []) if g["type"] == "lower_third"), None)
     if lt and tallest_page:
         cap_top = h - style["margin_v"] - tallest
-        lt_bottom = h - box["bottom"] - round(h * 0.10)
+        try:
+            import render as _render  # noqa: WPS433
+            gap = _render.LOWER_THIRD_GAP
+        except ImportError:
+            gap = 0.15
+        lt_bottom = h - box["bottom"] - round(h * gap)
         clash = [pg for pg in pages if pg["start"] < lt["at"] + lt["duration"] and pg["end"] > lt["at"]
                  and h - style["margin_v"] - (len(pg["lines"]) * style["size"] * 1.2) < lt_bottom]
         res.append(check("lower third clear of captions", "PASS" if not clash else "WARN",
