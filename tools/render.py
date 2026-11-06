@@ -437,6 +437,7 @@ def drawtext_block(font: str, textfile: Path, size: int, color: str, y_expr: str
 
 HOOK_SIZE = 0.046      # headline font size as a fraction of frame height
 HOOK_WRAP = 18         # characters per headline line
+LOWER_THIRD_GAP = 0.15  # fraction of frame height above the bottom safe zone; clears a two-line caption page
 
 
 def hook_text_height(text: str, out_h: int) -> int:
@@ -543,8 +544,8 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
             lf.write_text(str(lt["text"]))
             at, dur = float(lt.get("at") or 1.0), float(lt.get("duration") or 3.0)
             size = round(out_h * 0.028)
-            # Sits just above the caption band so the two never overlap.
-            y = f"h-{box['bottom']}-{round(out_h * 0.10)}-text_h"
+            # Sits above the caption band (two-line page plus padding) so the two never overlap.
+            y = f"h-{box['bottom']}-{round(out_h * LOWER_THIRD_GAP)}-text_h"
             vchain.append(f"{cur}drawtext=fontfile='{font}':textfile='{lf}':fontsize={size}:fontcolor=white:"
                           f"x={box['side']}+{round(out_w * 0.02)}:y={y}:box=1:boxcolor={accent}@0.9:boxborderw={size // 2}:"
                           f"enable='between(t,{at:.3f},{at + dur:.3f})'[lt]")
