@@ -13,6 +13,7 @@ Reference files (read when the stage needs them):
 - `reference/compliance.md`: hard rules and the per-ad compliance checklist
 - `reference/copy-package.md`: primary text, headlines, CTA, Instant Form
 - `reference/launch.md`: campaign structure, pre-publish audit, kill/keep rules
+- `reference/edit-checklist.md`: what a trained editor checks by eye on every render before a gate
 
 ## Stage 0: start or resume
 
@@ -109,7 +110,7 @@ Follow `reference/scripts-and-editing.md` for cadence, captions, graphics, sound
 
 1. `.venv/bin/python tools/render.py work/edl/<adname>.yaml` renders `work/cuts/<adname>_master.mp4` (reframed, graded, B-roll, hook text, lower third, music ducked under the voice, SFX, two-pass loudness) with no captions yet.
 2. `.venv/bin/python tools/transcribe.py work/cuts/<adname>_master.mp4 --out work/transcripts` (or add `--captions auto` to step 1 when a backend is installed).
-3. `.venv/bin/python tools/render.py work/edl/<adname>.yaml --captions work/transcripts/<adname>_master.words.json` burns captions in the style from `config.yaml` (`captions.style`) and writes `exports/<adname>.mp4` plus `exports/<adname>.render.json` (the timeline sidecar for QA and DECISIONS).
+3. `.venv/bin/python tools/render.py work/edl/<adname>.yaml --captions work/transcripts/<adname>_master.words.json` burns captions in the style from `config.yaml` (`captions.style`, or `caption_style` in the EDL for one ad) and writes `exports/<adname>.mp4` plus `exports/<adname>.render.json` (the timeline sidecar for QA and DECISIONS). `--all-ratios --captions auto` renders every ratio in `batch_defaults.aspect_ratios` in one go, transcribing once.
 
 Key points:
 - Pattern interrupt every 2-4s in the first 10s (alternate `zoom: 1.0` and `zoom: 1.08-1.12`, B-roll, text); B-roll shows what the VO says; face on screen in hook and CTA.
@@ -118,7 +119,7 @@ Key points:
 - Mix to the loudness target in `config.yaml`, verified by `tools/qa.py`.
 - Must make complete sense with sound off, and with eyes closed.
 
-**Self-review loop (every render, before Bruce sees it):** render, then look at the QA evidence (first frame, safe-zone frames, contact sheet, mobile frames) and the `.render.json`, fix the EDL, re-render. Up to three passes. Typical fixes: hook text wraps to three lines (shorten it), caption page clashes with the lower third (move `lower_third.at`), B-roll covers the speaker during the CTA (shorten `duration`), zoom alternation missing (set `zoom` on every other clip), music audible over speech (lower `gain_db`).
+**Self-review loop (every render, before Bruce sees it):** run `reference/edit-checklist.md`: render, then look at the QA evidence (first frame, safe-zone frames, contact sheet, mobile frames) and the `.render.json`, fix the EDL, re-render. Up to three passes. Typical fixes: hook text wraps to three lines (shorten it), caption page clashes with the lower third (move `lower_third.at`), B-roll covers the speaker during the CTA (shorten `duration`), zoom alternation missing (set `zoom` on every other clip), music audible over speech (lower `gain_db`).
 
 **Single-variable versions (`tools/variants.py`):** when `batch_defaults.variants.enabled` is yes, write `work/edl/<hero>.variants.yaml` next to the approved hero EDL (format in the tool's docstring): the hero's swap-able clips carry `slot: hook`, `slot: offer`, `slot: cta`, and each dimension value patches `hook_text`, the slot clip, callouts, or the end card. Run `.venv/bin/python tools/variants.py <file>` to write the EDLs and `work/edl/variants/MATRIX.md`, proxy-check two of them, then `--render --captions auto` for all. Log every variant in `DECISIONS.md` as `iteration` of the hero. Variants are not concept diversity: they still count as one concept for Meta's similarity grouping, so the batch also needs its genuinely different concepts below.
 
@@ -136,7 +137,7 @@ For every ad, write `exports/<adname>_copy.md` per `reference/copy-package.md`. 
 
 1. Run `.venv/bin/python tools/qa.py exports/*.mp4 --qa-dir qa --script brief/08_scripts.md`. It checks specs, loudness, black frames, silent openings, opening similarity, caption geometry against the safe zone, caption and lower-third overlap, headline on frame 1, a face in the hook and the CTA, duration guidance, and that every script line is heard in the captions. It writes evidence images. Read each ad's `exports/<adname>.render.json` to know what should be on screen when.
 2. Open and look at every evidence image: contact sheet, first frame (would it stop a scroll as a still?), safe-zone frames, mobile 360px frames.
-3. Diff burned-in captions against the transcript; spell-check and fact-check every on-screen word.
+3. Run `.venv/bin/python tools/lint_copy.py batches/<id> --strict` (em dashes, jargon, personal-attribute wording, unproven claims, fake urgency, unlabeled numbers, headline and first-line length) on the copy files, EDL texts, and captions. Fix every FAIL; justify every WARN at the gate. Then spell-check and fact-check every on-screen word against the transcript.
 4. Run the compliance checklist from `reference/compliance.md` line by line, per ad.
 5. Hook audit: no two concepts share the same opening shot plus opening line.
 6. Mark every MANUAL row in `qa/REPORT.md` PASS or FAIL. Fix and re-run until nothing fails. Never deliver a failing ad.

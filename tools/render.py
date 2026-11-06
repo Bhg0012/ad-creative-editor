@@ -513,7 +513,10 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
         # Headline hook text from frame 1, inside the top safe zone
         if edl.get("hook_text"):
             hf = tmp / "hook.txt"
-            hf.write_text(wrap_text(str(edl["hook_text"]), HOOK_WRAP))
+            wrapped = wrap_text(str(edl["hook_text"]), HOOK_WRAP)
+            if wrapped.count("\n") >= 2:
+                print(f"WARNING: hook_text wraps to {wrapped.count(chr(10)) + 1} lines; shorten it to read in one glance")
+            hf.write_text(wrapped)
             secs = float(edl.get("hook_text_seconds") or DEFAULTS["hook_text_seconds"])
             size = round(out_h * HOOK_SIZE)
             vchain.append(f"{cur}{drawtext_block(font, hf, size, 'white', f'{box['top']}+{round(out_h * 0.02)}', 0.0, secs, 'black@0.6', line_spacing=round(size * 0.15))}[hook]")
@@ -620,17 +623,20 @@ def finalize(comp: Path, out: Path, lf: str, ass: Path | None, fonts_dir: Path, 
     return res.stderr
 
 
-def build_captions(words_json: Path, out_w: int, out_h: int, ass_out: Path, cfg: dict) -> None:
+def build_captions(words_json: Path, out_w: int, out_h: int, ass_out: Path, cfg: dict, edl: dict | None = None) -> None:
+    """Captions from the master transcript. The EDL may add `caption_keywords` and override `caption_style`."""
     import captions as cap  # noqa: WPS433 (local tool module)
 
+    edl = edl or {}
     biz = cfg.get("business") or {}
     c = cfg.get("captions") or {}
     words = cap.apply_fixes(json.loads(words_json.read_text()), c.get("fixes") or {})
+    keywords = {k.lower() for k in (c.get("keywords") or [])} | {k.lower() for k in (edl.get("caption_keywords") or [])}
     ass = cap.build_ass(words, out_w, out_h, font=biz.get("caption_font_name") or "Montserrat ExtraBold",
                         accent=(biz.get("brand_colors") or {}).get("accent", "#E55B13"),
                         max_words=max(2, min(5, int(c.get("words_per_chunk_max") or 4))),
-                        uppercase=bool(c.get("uppercase")), keywords={k.lower() for k in c.get("keywords") or []},
-                        style=str(c.get("style") or "chunk"))
+                        uppercase=bool(c.get("uppercase")), keywords=keywords,
+                        style=str(edl.get("caption_style") or c.get("style") or "chunk"))
     ass_out.write_text(ass)
 
 
@@ -777,12 +783,13 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
             return master
 
         ass = cuts / f"{edl['name']}.ass"
-        build_captions(words, out_w, out_h, ass, cfg)
+        build_captions(words, out_w, out_h, ass, cfg, edl)
         final = exports / f"{edl['name']}.mp4"
         log = finalize(comp, final, lf, ass, ROOT / "brand" / "fonts", ENC_FINAL, fps)
         if re.search(r"fontselect|Using default font|font.*not found", log, re.I):
             print("WARNING: libass could not load the caption font; check brand/fonts and business.caption_font_name:\n" + log)
-        timeline["captions"] = {"words_json": str(words), "ass": str(ass), "style": (cfg.get("captions") or {}).get("style", "chunk")}
+        timeline["captions"] = {"words_json": str(words), "ass": str(ass),
+                                "style": str(edl.get("caption_style") or (cfg.get("captions") or {}).get("style") or "chunk")}
         (exports / f"{edl['name']}.render.json").write_text(json.dumps(timeline, indent=1))
         print(f"Final: {final} ({total:.2f}s, {out_w}x{out_h}@{fps}); sidecar {exports / (edl['name'] + '.render.json')}")
         return final
@@ -798,6 +805,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("edl", nargs="?", help="EDL yaml")
     ap.add_argument("--ratio", help="override the EDL ratio: 9:16, 4:5 or 1:1")
+    ap.add_argument("--all-ratios", action="store_true",
+                    help="render every ratio in config batch_defaults.aspect_ratios; the timeline is identical, so the "
+                         "first master is transcribed once and its words are reused for the other ratios")
     ap.add_argument("--captions", help="'auto' to transcribe the master, or a path to a words.json")
     ap.add_argument("--proxy", action="store_true", help="fast 540 px rough cut with timecode, no music or graphics")
     ap.add_argument("--out-dir", help="override the output folder")
@@ -809,7 +819,19 @@ def main() -> int:
         return 0
     if not args.edl:
         ap.error("edl is required (or --example)")
-    render(Path(args.edl), args.ratio, args.captions, args.proxy, args.keep_tmp, Path(args.out_dir) if args.out_dir else None)
+    out_dir = Path(args.out_dir) if args.out_dir else None
+    if not args.all_ratios:
+        render(Path(args.edl), args.ratio, args.captions, args.proxy, args.keep_tmp, out_dir)
+        return 0
+    ratios = [str(r) for r in ((load_config().get("batch_defaults") or {}).get("aspect_ratios") or ["9:16", "4:5"])]
+    captions_arg = args.captions
+    for ratio in ratios:
+        out = render(Path(args.edl), ratio, captions_arg, args.proxy, args.keep_tmp, out_dir)
+        if captions_arg == "auto" and not args.proxy:
+            # Reuse the first ratio's transcript: same cuts, same timeline, same words.
+            sidecar = out.parent / f"{out.stem}.render.json"
+            if sidecar.exists():
+                captions_arg = json.loads(sidecar.read_text()).get("captions", {}).get("words_json") or captions_arg
     return 0
 
 

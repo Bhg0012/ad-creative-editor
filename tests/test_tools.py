@@ -530,3 +530,59 @@ def test_inventory_sheets(footage, tmp_path):
     assert (tmp_path / "sheets" / "landscape.png").stat().st_size > 0
     rows = (tmp_path / "inv.csv").read_text()
     assert "photo.heic" in rows and "rotated.mp4" in rows
+
+
+import lint_copy  # noqa: E402
+
+
+def test_lint_copy_catches_house_rule_breaks(tmp_path):
+    cfg = {"offer": {"urgency_or_scarcity": "none", "price": "$497"}, "proof_assets": {"client_results": []}}
+    f = lint_copy.lint_text("Struggling to pay bills? Our SEO funnel is guaranteed. Only 2 spots left. 140 reviews in 30 days.",
+                            "t", cfg)
+    whys = " | ".join(x["why"] for x in f)
+    levels = {x["level"] for x in f}
+    assert "personal attribute" in whys and "jargon 'seo'" in whys and "claim 'guaranteed'" in whys
+    assert "urgency 'only 2 spots'" in whys and "not labeled (example)" in whys and "FAIL" in levels
+    assert not lint_copy.lint_text("Huntsville roofers: 9 reviews vs 140? (example)", "t", cfg)
+    assert not lint_copy.lint_text("Set up for $497. Tap learn more.", "t", cfg)   # price from config is allowed
+    assert any("em dash" in x["why"] for x in lint_copy.lint_text("a " + EM_DASH + " b", "t", cfg))
+    batch = tmp_path / "b"
+    (batch / "exports").mkdir(parents=True)
+    (batch / "exports" / "x_copy.md").write_text("# Primary text\n\nWe help contractors. We do SEO. We are the best.\n\n"
+                                                 "# Headlines\n\n- More 5-star reviews on autopilot for your business (49)\n")
+    (batch / "work" / "edl").mkdir(parents=True)
+    (batch / "work" / "edl" / "a.yaml").write_text("name: x\nhook_text: 'Guaranteed #1 on Google'\nclips: []\n")
+    findings = lint_copy.lint_batch(batch, cfg)
+    whys = " | ".join(x["why"] for x in findings)
+    assert "more 'we/I' than 'you'" in whys and "headline is 50 characters" in whys and "claim 'guaranteed'" in whys
+
+
+def test_metrics_reads_mcp_json_and_flags_fatigue(tmp_path):
+    rows = []
+    for day in range(14):
+        ctr = 0.02 if day < 7 else 0.012   # CTR drops 40% in the last week
+        rows.append({"name": "HSV_reviews_lostjobs_question_30s_9x16_v1", "date_start": f"2026-10-{day + 1:02d}",
+                     "spend": "20", "impressions": 2000, "inline_link_clicks": int(2000 * ctr), "frequency": 3.1,
+                     "actions": [{"action_type": "lead", "value": 1}, {"action_type": "video_view", "value": 500}],
+                     "video_thruplay_watched_actions": [{"action_type": "video_view", "value": 100}]})
+    j = tmp_path / "pull.json"
+    j.write_text(json.dumps({"ad_entities": rows}))
+    df = metrics.load_rows(j)
+    assert "actions_lead" in df.columns and "date_start" in df.columns
+    g = metrics.diagnose(metrics.compute(df), target_cpl=50)
+    assert g.iloc[0]["leads"] == 14 and g.iloc[0]["impressions"] == 28000
+    fat = g.attrs["fatigue"]
+    assert fat is not None and fat.iloc[0]["fatigue"] == "fatigue: refresh creative"
+
+
+def test_render_all_ratios_reuses_words(footage, monkeypatch):
+    edl = footage / "work" / "edl" / "TEST_offer_angle_question_10s_9x16_v1.yaml"
+    words = footage / "work" / "transcripts" / "landscape.words.json"
+    monkeypatch.setattr(sys, "argv", ["render.py", str(edl), "--all-ratios", "--captions", str(words)])
+    assert render.main() == 0
+    feed = footage / "exports" / "TEST_offer_angle_question_10s_4x5_v1.mp4"
+    assert feed.exists()
+    v = common.video_stream(common.probe(feed))
+    assert (int(v["width"]), int(v["height"])) == (1080, 1350)
+    sc = json.loads((footage / "exports" / "TEST_offer_angle_question_10s_4x5_v1.render.json").read_text())
+    assert sc["ratio"] == "4:5" and sc["captions"]["style"] == "chunk"
