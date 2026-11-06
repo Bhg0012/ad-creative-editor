@@ -93,9 +93,11 @@ def theme(width: int, height: int, duration: float, cfg: dict) -> str:
     colors = biz.get("brand_colors") or {}
     heavy = font_uri(biz.get("caption_font_name") or "Montserrat ExtraBold")
     bold = font_uri("Montserrat Bold") or heavy
+    cap_font = (cfg.get("captions") or {}).get("font_name")
+    caption = font_uri(cap_font) if cap_font else heavy
     css = (TEMPLATES / "theme.css").read_text()
     for k, v in {
-        "font_url": heavy, "font_bold_url": bold,
+        "font_url": heavy, "font_bold_url": bold, "caption_font_url": caption or heavy,
         "primary": colors.get("primary", "#3B96F6"), "accent": colors.get("accent", "#E55B13"),
         "width": width, "height": height, "safe_top": box["top"], "safe_bottom": box["bottom"], "safe_side": box["side"],
         "duration": f"{duration:.3f}",
@@ -209,6 +211,8 @@ def captions_html(spec: dict, th: str, size: int) -> str:
     for n, c in enumerate(chunks):
         start, end = c[0]["start"], cap.page_end(chunks, n)
         k = cap.pick_keyword(c, keywords) if style != "pill" else None
+        if style == "box" and k is None and c:
+            k = max(range(len(c)), key=lambda i: len(c[i]["word"]))   # box style always marks one word
         spans = []
         for i, w in enumerate(c):
             w_start = w["start"] if i else start
