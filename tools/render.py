@@ -52,6 +52,8 @@ AUD_NORM = "aresample=48000:async=1,aformat=sample_fmts=fltp:channel_layouts=ste
 HDR_TO_SDR = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,"
               "zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
 
+CUT_FADE = 0.03  # seconds of audio fade at each cut boundary
+
 DEFAULTS = {
     "hook_text_seconds": 3.0,
     "end_card_seconds": 2.5,
@@ -71,17 +73,21 @@ ratio: "9:16"                 # 9:16 Reels/Stories, 4:5 Feed. Override with --ra
 hook_text: "Huntsville roofers: 9 reviews?"   # on screen from frame 1, max ~7 words
 hook_text_seconds: 3
 clips:                        # A-roll in timeline order; in/out are seconds in the source
-  - {src: raw/take3.mov, in: 12.40, out: 15.90, zoom: 1.0, focus: auto}
+  - {src: raw/take3.mov, in: 12.40, out: 15.90, zoom: 1.0, focus: auto, slot: hook}   # slot: a name variants can swap
   - {src: raw/take3.mov, in: 21.10, out: 26.75, zoom: 1.10, tighten: 0.45}
   - {src: raw/take5.mov, in: 3.00, out: 8.20, push: 1.08}   # slow push from 1.0 to 1.08
   - {src: raw/screenshot.png, duration: 2.5, push: 1.12}    # still image, Ken Burns push
 broll:                        # picture-only overlays on the timeline; the voice continues
   - {src: raw/phone_text.mov, at: 6.0, duration: 2.5, src_in: 0.0, label: "A text goes out"}
+  - {src: raw/review_screenshot.heic, at: 14.0, duration: 2.0, pip: {w: 0.72, x: 0.5, y: 0.40}}  # picture-in-picture
+callouts:                     # short on-screen text mid-video: a number, a re-hook, a label
+  - {text: "$4,800 roof job (example)", at: 9.0, duration: 2.0, position: center, accent: true}
 lower_third: {text: "Bruce, Auburn AL", at: 1.0, duration: 3.0}
+look: {contrast: 1.04, saturation: 1.08, sharpen: true}   # optional light grade on A-roll only
 music: {src: audio/music/track.mp3, gain_db: -18, duck: true, fade_out: 1.0}
 sfx:
   - {src: audio/sfx/whoosh.wav, at: 6.0, gain_db: -12}
-end_card: {text: "Tap Learn More", subtext: "Huntsville contractors", seconds: 2.5, logo: true}
+end_card: {headline: "More reviews. More calls.", text: "Tap Learn More", subtext: "Huntsville contractors", seconds: 2.5, logo: true}
 """
 
 
@@ -107,6 +113,31 @@ def resolve(path: str, edl_dir: Path) -> Path:
     raise SystemExit(f"EDL references a file that does not exist: {path}")
 
 
+def heic_to_png(src: Path, cache: Path) -> Path:
+    """iPhone photos arrive as HEIC, which this ffmpeg cannot read. Convert once (pillow-heif, or sips on macOS)."""
+    cache.mkdir(parents=True, exist_ok=True)
+    out = cache / f"{src.stem}.png"
+    if out.exists() and out.stat().st_mtime >= src.stat().st_mtime:
+        return out
+    try:
+        import pillow_heif
+        from PIL import Image
+
+        pillow_heif.register_heif_opener()
+        img = Image.open(src)
+        img = img.convert("RGB")
+        from PIL import ImageOps
+        ImageOps.exif_transpose(img).save(out)
+        return out
+    except ImportError:
+        pass
+    import shutil as _sh
+    if _sh.which("sips"):
+        subprocess.run(["sips", "-s", "format", "png", str(src), "--out", str(out)], check=True, capture_output=True)
+        return out
+    raise SystemExit(f"{src}: HEIC needs pillow-heif (.venv/bin/pip install pillow-heif) or macOS sips.")
+
+
 def load_edl(path: Path, ratio_override: str | None = None) -> dict:
     edl = load_yaml(path)
     if not edl.get("name"):
@@ -123,8 +154,11 @@ def load_edl(path: Path, ratio_override: str | None = None) -> dict:
             name = name.replace(f"_{tok}_", f"_{RATIO_TOKEN[ratio]}_")
     edl["name"] = name
     edl_dir = path.resolve().parent
-    for c in edl["clips"]:
+    for c in edl["clips"] + (edl.get("broll") or []):
         c["path"] = resolve(c["src"], edl_dir)
+        if c["path"].suffix.lower() == ".heic":
+            c["path"] = heic_to_png(c["path"], batch_dir_of(path) / "work" / "cuts" / "heic")
+    for c in edl["clips"]:
         still = c["path"].suffix.lower() in IMAGE_EXT
         c["still"] = still
         if still:
@@ -136,7 +170,6 @@ def load_edl(path: Path, ratio_override: str | None = None) -> dict:
                 raise SystemExit(f"{c['src']}: needs `in` and `out` with out > in.")
             c["in"], c["out"] = float(c["in"]), float(c["out"])
     for b in edl.get("broll") or []:
-        b["path"] = resolve(b["src"], edl_dir)
         b["still"] = b["path"].suffix.lower() in IMAGE_EXT
         if "at" not in b or "duration" not in b:
             raise SystemExit(f"broll {b['src']}: needs `at` and `duration`.")
@@ -148,6 +181,11 @@ def load_edl(path: Path, ratio_override: str | None = None) -> dict:
 
 
 # ---------- geometry ----------
+
+def ratio_of_size(w: int, h: int) -> str:
+    """Exact 'w:h' ratio string for a pixel size (used for picture-in-picture segments of any shape)."""
+    return f"{w}:{h}"
+
 
 def crop_box(src_w: int, src_h: int, ratio: str, focus: tuple[float, float], zoom: float) -> tuple[int, int, int, int]:
     """(w, h, x, y) of the largest `ratio` box in the source, centered on focus, divided by zoom."""
@@ -268,8 +306,25 @@ def tighten_ranges(t_in: float, t_out: float, gaps: list[tuple[float, float]], k
 
 # ---------- segments ----------
 
+def look_filter(look: dict | None) -> str | None:
+    """Optional light grade: eq (contrast, brightness, saturation) and a gentle unsharp."""
+    if not look:
+        return None
+    parts = []
+    eq = []
+    for key in ("contrast", "brightness", "saturation", "gamma"):
+        if look.get(key) is not None:
+            eq.append(f"{key}={float(look[key])}")
+    if eq:
+        parts.append("eq=" + ":".join(eq))
+    if look.get("sharpen"):
+        parts.append("unsharp=5:5:0.6:5:5:0.0")
+    return ",".join(parts) or None
+
+
 def video_filters(src_w: int, src_h: int, hdr: bool, ratio: str, out_w: int, out_h: int, fps: int,
-                  focus: tuple[float, float], zoom: float, push: float | None, duration: float) -> str:
+                  focus: tuple[float, float], zoom: float, push: float | None, duration: float,
+                  look: dict | None = None) -> str:
     f = []
     if hdr:
         f.append(HDR_TO_SDR)
@@ -284,6 +339,9 @@ def video_filters(src_w: int, src_h: int, hdr: bool, ratio: str, out_w: int, out
         f.append(f"crop={out_w}:{out_h}:(iw-{out_w})/2:(ih-{out_h})/2")
     else:
         f.append(f"scale={out_w}:{out_h}")
+    lf = look_filter(look)
+    if lf:
+        f.append(lf)
     f += [f"fps={fps}", "setsar=1", "format=yuv420p"]
     return ",".join(f)
 
@@ -295,7 +353,7 @@ def render_segment(clip: dict, t_in: float, t_out: float, out: Path, ratio: str,
     src_w, src_h = display_size(v)
     dur = t_out - t_in
     vf = video_filters(src_w, src_h, is_hdr(v), ratio, out_w, out_h, fps, focus,
-                       float(clip.get("zoom") or 1.0), clip.get("push"), dur)
+                       float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"))
     if timecode_from is not None and font:
         vf += (f",drawtext=fontfile='{font}':text='%{{pts\\:hms\\:{timecode_from:.3f}}}':fontsize={max(18, out_h // 30)}:"
                f"fontcolor=white:box=1:boxcolor=black@0.6:x=10:y=10")
@@ -310,7 +368,9 @@ def render_segment(clip: dict, t_in: float, t_out: float, out: Path, ratio: str,
             args += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo", "-map", "0:v:0", "-map", "1:a:0"]
         else:
             args += ["-map", "0:v:0", "-map", "0:a:0"]
-    args += ["-vf", vf, "-af", AUD_NORM, *enc, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+    # 30 ms fades at every cut so hard cuts never click or pop.
+    af = f"{AUD_NORM},afade=t=in:d={CUT_FADE},afade=t=out:st={max(0.0, dur - CUT_FADE):.3f}:d={CUT_FADE}"
+    args += ["-vf", vf, "-af", af, *enc, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
              "-shortest", "-video_track_timescale", "90000", str(out)]
     run_ffmpeg(args)
 
@@ -325,15 +385,20 @@ def render_end_card(card: dict, out: Path, out_w: int, out_h: int, fps: int, enc
     text_f = tmp / "endcard_text.txt"
     text_f.write_text(str(card.get("text") or "Tap Learn More"))
     size = max(28, round(out_h * 0.055))
-    filters = [f"drawtext=fontfile='{font}':textfile='{text_f}':fontsize={size}:fontcolor=white:"
-               f"x=(w-text_w)/2:y=(h*0.46-text_h/2)"]
+    filters = []
+    if card.get("headline"):
+        head_f = tmp / "endcard_head.txt"
+        head_f.write_text(wrap_text(str(card["headline"]), 20))
+        filters.append(f"drawtext=fontfile='{font}':textfile='{head_f}':fontsize={round(size * 0.85)}:fontcolor=white:"
+                       f"x=(w-text_w)/2:y=(h*0.36-text_h):line_spacing={round(size * 0.1)}")
+    # CTA as a pill button in the accent color (the thing a thumb would tap)
+    filters.append(f"drawtext=fontfile='{font}':textfile='{text_f}':fontsize={size}:fontcolor=white:"
+                   f"x=(w-text_w)/2:y=(h*0.46-text_h/2):box=1:boxcolor=0x{accent}:boxborderw={round(size * 0.55)}")
     if card.get("subtext"):
         sub_f = tmp / "endcard_sub.txt"
         sub_f.write_text(str(card["subtext"]))
         filters.append(f"drawtext=fontfile='{font}':textfile='{sub_f}':fontsize={round(size * 0.6)}:fontcolor=white@0.92:"
-                       f"x=(w-text_w)/2:y=(h*0.46+{size})")
-    filters.append(f"drawbox=x=(iw-{even(out_w * 0.22)})/2:y=ih*0.46-{size}*1.2:w={even(out_w * 0.22)}:h={max(4, out_h // 300)}:"
-                   f"color=0x{accent}:t=fill")
+                       f"x=(w-text_w)/2:y=(h*0.46+{round(size * 1.4)})")
     args = ["-f", "lavfi", "-t", f"{secs:.3f}", "-i", f"color=c=0x{bg}:s={out_w}x{out_h}:r={fps}",
             "-f", "lavfi", "-t", f"{secs:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
     logo = ROOT / "brand" / "logo.png"
@@ -413,12 +478,26 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
         clip = {"path": b["path"], "still": b["still"], "vstream": b["vstream"], "astream": None,
                 "zoom": b.get("zoom") or 1.0, "push": b.get("push")}
         src_in = float(b.get("src_in") or 0.0)
-        render_segment(clip, src_in, src_in + dur, seg, ratio, out_w, out_h, fps, ENC_INTER, (0.5, 0.5))
+        pip = b.get("pip")
+        if pip:
+            # Picture-in-picture: keep the B-roll's own shape, scale to a fraction of the frame width.
+            bw, bh = display_size(b["vstream"])
+            pw = even(out_w * float(pip.get("w") or 0.7))
+            ph = even(pw * bh / bw)
+            render_segment({**clip, "focus": None}, src_in, src_in + dur, seg, ratio_of_size(pw, ph), pw, ph, fps,
+                           ENC_INTER, (0.5, 0.5))
+            border = max(2, round(out_w * 0.004))
+            cx, cy = float(pip.get("x") or 0.5), float(pip.get("y") or 0.40)
+            px, py = even(cx * out_w - (pw + 2 * border) / 2), even(cy * out_h - (ph + 2 * border) / 2)
+            vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB,pad=iw+{2 * border}:ih+{2 * border}:{border}:{border}:color=white[b{idx}]")
+            vchain.append(f"{cur}[b{idx}]overlay=x={px}:y={py}:eof_action=pass:enable='between(t,{at:.3f},{at + dur:.3f})'[v{idx}]")
+        else:
+            render_segment(clip, src_in, src_in + dur, seg, ratio, out_w, out_h, fps, ENC_INTER, (0.5, 0.5))
+            vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB[b{idx}]")
+            vchain.append(f"{cur}[b{idx}]overlay=eof_action=pass:enable='between(t,{at:.3f},{at + dur:.3f})'[v{idx}]")
         inputs += ["-i", str(seg)]
-        vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB[b{idx}]")
-        vchain.append(f"{cur}[b{idx}]overlay=eof_action=pass:enable='between(t,{at:.3f},{at + dur:.3f})'[v{idx}]")
         cur = f"[v{idx}]"
-        timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label")})
+        timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label"), "pip": bool(pip)})
         if b.get("label") and not proxy:
             lf = tmp / f"broll_label_{idx}.txt"
             lf.write_text(wrap_text(str(b["label"]), 22))
@@ -440,6 +519,21 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
             vchain.append(f"{cur}{drawtext_block(font, hf, size, 'white', f'{box['top']}+{round(out_h * 0.02)}', 0.0, secs, 'black@0.6', line_spacing=round(size * 0.15))}[hook]")
             cur = "[hook]"
             timeline["graphics"].append({"type": "hook_text", "text": edl["hook_text"], "at": 0.0, "duration": secs})
+        # Callouts: short on-screen text mid-video (a number, a re-hook, a label). Centered, above the caption band.
+        for n, co in enumerate(edl.get("callouts") or []):
+            cf = tmp / f"callout_{n}.txt"
+            cf.write_text(wrap_text(str(co["text"]), 16))
+            at, dur = float(co["at"]), float(co.get("duration") or 2.0)
+            size = round(out_h * float(co.get("size") or 0.05))
+            pos = str(co.get("position") or "center")
+            y = {"top": f"{box['top']}+{round(out_h * 0.02)}", "center": "(h*0.42-text_h/2)",
+                 "lower": f"h-{box['bottom']}-{round(out_h * 0.12)}-text_h"}[pos]
+            if pos == "top" and at < (float(edl.get("hook_text_seconds") or DEFAULTS["hook_text_seconds"]) if edl.get("hook_text") else 0.0):
+                raise SystemExit(f"callout {co['text']!r} at {at}s collides with the hook text; use position: center")
+            color = accent if co.get("accent") else "black@0.6"
+            vchain.append(f"{cur}{drawtext_block(font, cf, size, 'white', y, at, at + dur, color, line_spacing=round(size * 0.15))}[co{n}]")
+            cur = f"[co{n}]"
+            timeline["graphics"].append({"type": "callout", "text": co["text"], "at": at, "duration": dur, "position": pos})
         lt = edl.get("lower_third")
         if lt and lt.get("text"):
             lf = tmp / "lower_third.txt"
@@ -551,6 +645,29 @@ def transcribe_master(master: Path, out_dir: Path) -> Path | None:
     return out_dir / f"{master.stem}.words.json"
 
 
+def timeline_of(edl_path: Path, ratio: str | None = None) -> list[dict]:
+    """Clip map (src, src_in, src_out, at, duration) for an EDL without rendering video.
+
+    Uses the same tightening and still-duration rules as render(), so word timings from
+    source transcripts can be mapped onto the master timeline (see tools/make_sample.py).
+    """
+    cfg = load_config()
+    edl = load_edl(edl_path, ratio)
+    keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
+    out, t = [], 0.0
+    for c in edl["clips"]:
+        ranges = [(c["in"], c["out"])]
+        if c.get("tighten") and not c["still"]:
+            ranges = tighten_ranges(c["in"], c["out"], silences(c["path"], c["in"], c["out"], float(c["tighten"])), keep)
+        for a, b in ranges:
+            out.append({"src": c["src"], "src_in": round(a, 3), "src_out": round(b, 3), "at": round(t, 3), "duration": round(b - a, 3)})
+            t += b - a
+    card = edl.get("end_card")
+    if card:
+        out.append({"src": "end_card", "at": round(t, 3), "duration": float(card.get("seconds") or DEFAULTS["end_card_seconds"])})
+    return out
+
+
 # ---------- main ----------
 
 def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: bool, keep_tmp: bool,
@@ -592,7 +709,9 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         segments, t = [], 0.0
         timeline_clips = []
         keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
+        look = edl.get("look") or (cfg.get("edit") or {}).get("look")
         for n, c in enumerate(edl["clips"]):
+            c["_look"] = None if c["still"] else look
             src_w, src_h = display_size(c["vstream"])
             focus = c.get("focus", "auto" if (src_w / src_h) > (out_w / out_h) * 1.05 and not c["still"] else [0.5, 0.5])
             if focus == "auto":

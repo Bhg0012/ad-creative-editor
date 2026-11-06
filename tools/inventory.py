@@ -2,6 +2,7 @@
 
 Usage:
     .venv/bin/python tools/inventory.py --raw raw --out batches/<id>/work/inventory.csv
+    .venv/bin/python tools/inventory.py --raw raw --out ... --sheets batches/<id>/work/sheets   # 1 frame / 2 s per clip
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import display_size, fps, probe, rotation  # noqa: E402
+from common import display_size, fps, probe, rotation, run_ffmpeg  # noqa: E402
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".heic", ".webp"}
 MEDIA_EXT = IMAGE_EXT | {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".mts", ".wav", ".mp3", ".m4a", ".aac"}
@@ -61,10 +62,22 @@ def describe(path: Path) -> dict:
     return row
 
 
+def contact_sheet(path: Path, duration: float, out: Path, every: float = 2.0, cols: int = 6) -> None:
+    """One frame every `every` seconds, timecode on each tile, so a whole take can be read at a glance."""
+    import math
+
+    frames = max(1, math.ceil(duration / every))
+    rows = max(1, math.ceil(frames / cols))
+    run_ffmpeg(["-i", str(path), "-vf",
+                f"fps=1/{every},scale=320:-2,drawtext=text='%{{pts\\:hms}}':fontsize=20:fontcolor=white:box=1:boxcolor=black@0.5:x=6:y=6,"
+                f"tile={cols}x{rows}:padding=4:color=0x202020", "-frames:v", "1", str(out)])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="raw")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--sheets", help="folder for per-clip contact sheets (png)")
     args = ap.parse_args()
     files = sorted(p for p in Path(args.raw).rglob("*") if p.is_file() and p.suffix.lower() in MEDIA_EXT)
     if not files:
@@ -76,10 +89,14 @@ def main() -> int:
         w.writeheader()
         for p in files:
             try:
-                w.writerow(describe(p))
+                row = describe(p)
+                w.writerow(row)
+                if args.sheets and row["kind"] == "video" and row["duration_s"]:
+                    Path(args.sheets).mkdir(parents=True, exist_ok=True)
+                    contact_sheet(p, float(row["duration_s"]), Path(args.sheets) / f"{p.stem}.png")
             except RuntimeError as e:
                 w.writerow({**{k: "" for k in FIELDS}, "file": str(p), "flags": f"unreadable: {e}"})
-    print(f"Wrote {len(files)} rows to {args.out}")
+    print(f"Wrote {len(files)} rows to {args.out}" + (f" and contact sheets to {args.sheets}" if args.sheets else ""))
     return 0
 
 

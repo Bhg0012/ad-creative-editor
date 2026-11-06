@@ -95,3 +95,43 @@ So: the whole editing pipeline is free and local. The only recurring cost is the
 3. Run `tools/setup_mac.sh` once, then `.venv/bin/python tools/doctor.py`.
 4. Fill the `TBD` offer and market fields in `config.yaml` (doctor lists them).
 5. Film the first batch and run `/ad-batch`. The first real footage will surface the remaining rough edges in `render.py` faster than any more research.
+
+## 8. Update 2026-11-06: overnight build
+
+Added, tested, and merged:
+
+| Feature | Where | Why it matters for conversion |
+|---|---|---|
+| Single-variable versions of a hero ad | `tools/variants.py`, `config.yaml` -> `batch_defaults.variants` | Hormozi's volume math: one body, many hooks, markets, offers, CTAs. Each version renders in every ratio with its own name, and `MATRIX.md` says what changed. The config switch makes the shot list ask for the extra takes up front. |
+| Callouts | EDL `callouts[]` | A number, a re-hook, or the offer line on screen at the moment it is spoken. Re-hooks at 3 s, 8-10 s and before the proof are where viewers drop. |
+| Picture-in-picture B-roll | EDL `broll[].pip` | Review screenshots and phone photos as an inset with a white border instead of a blurry full-frame crop. HEIC photos straight from the iPhone are converted on the fly. |
+| End card CTA button | EDL `end_card.text` drawn as an accent pill, optional `headline` | The last 2-3 s state the exact action, and it looks like something a thumb would tap. |
+| Light grade | EDL or config `look` | Phone footage gets a consistent, slightly punchier look across every concept without crushing skin tones. |
+| 30 ms audio fades at every cut | `tools/render.py` | Jump cuts never click or pop. Professional editors do this by reflex; the engine now does it for every segment. |
+| Rotated iPhone clips and HDR footage | `tools/render.py` tests | Portrait video stored as rotated landscape (what iPhones write) and HLG or HDR10 clips render correctly; both are covered by tests. |
+| Per-clip contact sheets | `tools/inventory.py --sheets` | Read a whole take at a glance with timecodes, which is how B-roll gets tagged in Stage 5. |
+| Stricter QA | `tools/qa.py` | Caption geometry proven inside the safe zone with the real font metrics, caption vs lower third overlap, headline present on frame 1, a face in the hook and in the CTA, duration guidance, and `--script` checks every script line is heard. |
+| Review page | `tools/review.py` | One local HTML page per batch with players, timelines, captions, QA tables, copy, and a notes box per ad that copies back into the chat. Serve it with one command and review on the phone. |
+| Self-review loop in the skill | `.claude/skills/ad-batch/SKILL.md` Stage 6 | Render, look at the QA evidence, fix the EDL, re-render, up to three passes, before Bruce sees anything. |
+
+Test suite: 31 tests, including a full synthetic render with every feature above.
+
+### What one ad costs if Claude runs on the API instead of the Claude Code plan
+
+If you run the engine inside Claude Code on your plan, the plan covers it. The numbers below are for the case where the same work runs through the API (for example an automated pipeline or the Agent SDK). They are estimates from the token shapes of this workflow, not measurements; the first real batch will give exact numbers from the usage fields.
+
+Assumptions for one hero ad from an approved script and footage already on disk (Stages 5 and 6, plus QA): the skill and config in context (about 8K tokens, cached), transcripts and inventory (about 6K), the EDL (1K), 3 to 5 contact sheets and 20 to 30 QA frames viewed across two or three self-review passes (about 40K image tokens), roughly 40 tool calls, and 30 to 40K output tokens including thinking.
+
+| Model | Price (input / output per million tokens; cache reads) | One hero ad | One variant (render plus a check) | Full batch (research through launch plan, 6 concepts plus variants) |
+|---|---|---|---|---|
+| Claude Fable 5.1 | $10 / $50; $0.25 | about $3 to $5 | about $0.20 to $0.50 | about $20 to $45 |
+| Claude Opus 5.5 | $4 / $20; $0.20 | about $1.50 to $2.50 | about $0.10 to $0.25 | about $9 to $20 |
+| Claude Sonnet 5.5 | $2 / $10; $0.20 | about $0.75 to $1.25 | about $0.05 to $0.15 | about $5 to $10 |
+
+Prices are Anthropic's first-party API rates as cached in the Claude API skill on 2026-10-06; check the pricing page before budgeting. The biggest lever is images: every QA frame costs roughly (width x height) / 750 tokens, so the engine downsizes evidence frames to 360 px wide before Claude looks at them.
+
+### How long one ad takes
+
+Machine time on an M-series Mac (approximate): proxy 10 to 20 s, master 30 to 60 s, transcription of the master 10 to 30 s with mlx-whisper, captioned final 30 to 60 s, QA 20 s. Under three minutes of rendering per ad end to end.
+
+Claude's working time: the first hero ad from an approved script, including footage review, selects, EDL, two or three self-review passes, and QA, runs 10 to 20 minutes of session time. Each variant is 1 to 3 minutes, mostly render time. A full batch (research, angles, offer, hooks and scripts, six concepts, variants, copy, QA, launch plan) is 2 to 4 hours of session time spread across the gates, because every gate waits for your yes. Filming and your review cycles dominate the calendar, not the editor.
