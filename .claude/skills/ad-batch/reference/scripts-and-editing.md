@@ -50,7 +50,7 @@ The output sidecar `exports/<adname>.render.json` lists where every clip, overla
 
 - Burned in on every ad. Meta calls captions "recommended" and sound "strongly recommended": design for both sound off and sound on.
 - Pipeline: `tools/render.py` renders the master, `tools/transcribe.py` transcribes it, `tools/render.py --captions <words.json>` burns the captions. This keeps captions frame-accurate to the final timeline. Fix recurring transcription errors via `captions.fixes` in `config.yaml`, not by hand-editing. For the tightest word timing (karaoke styles) install WhisperX; mlx-whisper is fine for `chunk`.
-- Styles (`captions.style` in `config.yaml`, or `tools/captions.py --style`): `chunk` (2-5 words per page, one keyword in accent; the clean, trust-first default for older trade owners), `highlight` (same pages, the spoken word turns accent and pops), `karaoke` (accent fills each word as spoken), `reveal` (words appear one by one), `hormozi` (1-3 words, ALL CAPS, bigger, spoken word accent). No independent study shows one style wins; the mechanism that matters is word-timed, high-contrast, few words per page. Make one `hormozi` or `highlight` variant per batch and let hook and hold rates decide.
+- Engines: `captions.engine: html` (default) renders word-timed pages in the browser: `pill` (the spoken word sits in an accent pill, the Captions-app look), `highlight` (the spoken word turns accent), `clean` (pages only, one keyword accent). `captions.engine: ass` is the fast libass path with `chunk`, `highlight`, `karaoke`, `reveal`, `hormozi`. Per ad, `caption_style` and `caption_engine` in the EDL override config. No independent study shows one style wins; the mechanism that matters is word-timed, high-contrast, few words per page. Make one variant per batch in a different style and let hook and hold rates decide.
 - All styles: heavy sans (Montserrat ExtraBold), white with black outline and shadow, accent `#E55B13`, max 2 lines, positioned above the bottom safe zone.
 - Burn in with `ass=<file>.ass:fontsdir=brand/fonts`. Check the ffmpeg log for `fontselect` fallback warnings and look at a frame: if the brand font did not load, libass silently substitutes another font.
 - Headline text hook visible on frame 1, not after a fade-in.
@@ -65,9 +65,25 @@ The output sidecar `exports/<adname>.render.json` lists where every clip, overla
 
 `tools/qa.py` draws these zones in red on sample frames. Nothing important may touch red.
 
-## Motion graphics
+## Motion plates
 
-Default: what `tools/render.py` draws (hook headline, B-roll label, lower third, end card) plus `overlay` of PNGs made from the brand kit. For animated counters, review cards, phone mockups, draw-on arrows, before/after splits, and lower thirds, use Remotion in `graphics/` (Node/React; Remotion's license is free for individuals and companies of up to 3 people; confirm at remotion.dev before using it if AuburnSEO grows past that). Keep one reusable composition per graphic type so later batches reuse them.
+Every graphic is a motion plate: an HTML template in `tools/plates/` filled from the EDL, rendered frame by frame in headless Chromium with a transparent background (`tools/plates.py`), and composited by `tools/render.py` at its time. All templates share `tools/plates/theme.css` (font, colors, radius, shadow, spring easing), so the look is one system and a restyle is one file. Each plate enters with a spring pop, exits with a short fade, and triggers a sound effect (`graphics.auto_sfx`: pop, click, whoosh, ding, riser from `audio/sfx/` or synthesized defaults).
+
+| EDL key | Plate | Use it for |
+|---|---|---|
+| `hook_text` | hook card at the top, on from frame 1 | the text hook; `*word*` turns the word accent |
+| `callouts[]` | label (dark, light, or `accent: true`) | one number, one re-hook, one offer line; `emoji` optional |
+| `plates[] type: stat` | big number counting up, `prefix`, `suffix`, `label` | the one figure that matters |
+| `plates[] type: compare` | two growing bars with values, `title`, `left`, `right`, `note` | you vs them, before vs after |
+| `plates[] type: card` | title plus up to 5 ticked lines appearing one by one | what they get, the steps |
+| `broll[]` still with `pip` | rounded, shadowed inset with slow zoom; `pip.device: phone` adds a bezel; `label` becomes a caption | screenshots, review cards, photos |
+| `lower_third` | name tag sliding in (`text: "Bruce, Auburn AL"` splits into name and sub) | the hook only |
+| `end_card` | brand background, logo pop, `headline`, pulsing CTA button, `subtext` | the last 2-3 s |
+| `captions` (config `captions.engine: html`) | word-timed pages, `pill` (spoken word in an accent pill), `highlight`, or `clean` | every ad |
+
+Positions: `position: top | center | lower` (center means the card's centre at 38% of the frame, above the caption band). Preview every plate on its frame with `tools/render.py <edl> --storyboard` before rendering; one still per type with `tools/plates.py demo --out work/plates_demo`.
+
+Only when a concept needs something these templates cannot do (a chart, a map, a phone mockup with scrolling): add a template to `tools/plates/` following the same structure (theme include, `.in`/`.out` classes, `{{placeholders}}`, the harness script) and register it in `tools/plates.py`. For animated counters, review cards, phone mockups, draw-on arrows, before/after splits, and lower thirds, use Remotion in `graphics/` (Node/React; Remotion's license is free for individuals and companies of up to 3 people; confirm at remotion.dev before using it if AuburnSEO grows past that). Keep one reusable composition per graphic type so later batches reuse them.
 
 - Brand colors `#3B96F6` / `#E55B13`. Motion 150-300ms ease-out. Every graphic readable in under 1 second.
 - Stat counters: only real numbers with a source shown.

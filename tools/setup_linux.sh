@@ -15,5 +15,6 @@ fi
 [ -d .venv ] || python3 -m venv .venv
 .venv/bin/pip install --upgrade -q pip
 .venv/bin/pip install -q -r requirements.txt
+[ -x /opt/pw-browsers/chromium ] || .venv/bin/playwright install chromium
 
 .venv/bin/python tools/doctor.py

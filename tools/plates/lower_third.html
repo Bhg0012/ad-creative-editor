@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.lt { position: absolute; left: calc(var(--safe-side) + .02 * var(--W)); display: flex; align-items: stretch; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); animation: lt-in .4s var(--ease-out) both, lt-out .25s ease-in both; animation-delay: 0s, calc(var(--dur) - .25s); }
+.bar { width: .35em; background: var(--accent); }
+.txt { background: rgba(15,17,21,.88); color: #fff; padding: .35em .8em .4em .7em; font-size: {{size}}px; font-weight: 800; line-height: 1.1; }
+.sub { font-size: .62em; font-weight: 700; color: var(--muted); margin-top: .12em; }
+@keyframes lt-in  { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+@keyframes lt-out { from { opacity: 1; } to { opacity: 0; } }
+</style></head><body><div class="stage">
+<div class="lt pos-lower"><div class="bar"></div><div class="txt">{{text}}<div class="sub">{{sub}}</div></div></div>
+</div><script>{{harness}}</script></body></html>

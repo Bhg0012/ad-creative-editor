@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+body { background: var(--primary); }
+.wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6em; padding: 0 var(--safe-side); text-align: center; color: #fff; }
+.logo { width: 26%; height: auto; margin-bottom: .6em; animation: plate-in .45s var(--spring) both; }
+.head { font-size: {{size}}px; font-weight: 800; line-height: 1.1; letter-spacing: -0.015em; animation: plate-in .45s var(--spring) both; animation-delay: .08s; white-space: pre-wrap; }
+.cta { margin-top: .5em; background: var(--accent); color: #fff; font-size: calc({{size}}px * .78); font-weight: 800; padding: .5em 1.1em; border-radius: 999px; box-shadow: var(--shadow); animation: plate-in .45s var(--spring) both, pulse 1.4s ease-in-out infinite; animation-delay: .22s, .9s; }
+.sub { font-size: calc({{size}}px * .44); font-weight: 700; color: rgba(255,255,255,.9); animation: plate-in .45s var(--spring) both; animation-delay: .32s; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+</style></head><body><div class="stage"><div class="wrap">
+{{logo_html}}
+<div class="head">{{headline}}</div>
+<div class="cta">{{text}}</div>
+<div class="sub">{{subtext}}</div>
+</div></div><script>{{harness}}</script></body></html>

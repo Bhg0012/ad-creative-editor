@@ -5,6 +5,7 @@ tabulate>=0.9
 numpy>=1.26
 pillow>=10.0
 pillow-heif>=0.18        # iPhone HEIC photos as stills and B-roll
+playwright>=1.45         # headless Chromium renders the motion plates (run: .venv/bin/playwright install chromium)
 opencv-python>=4.8
 matplotlib>=3.8
 seaborn>=0.13

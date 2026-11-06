@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.list { padding: .9em 1em 1em; width: calc(var(--W) - 2 * var(--safe-side) - 0.08 * var(--W)); }
+.list.in.center-x { animation-name: plate-in-x; } .list.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.title { font-size: {{size}}px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: .4em; }
+.item { display: flex; align-items: center; gap: .5em; font-size: calc({{size}}px * .68); font-weight: 700; margin-top: .45em; animation: item-in .35s var(--spring) both; }
+.tick { width: 1.15em; height: 1.15em; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: .9em; flex: none; }
+@keyframes item-in { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
+</style></head><body><div class="stage">
+<div class="card list in out center-x {{variant}} {{pos}}" style="{{style}}">
+  <div class="title">{{title}}</div>
+  {{items_html}}
+</div>
+</div><script>{{harness}}</script></body></html>

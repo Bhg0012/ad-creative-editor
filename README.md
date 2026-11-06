@@ -13,7 +13,7 @@ tools/setup_mac.sh          # installs ffmpeg-full, Python venv, mlx-whisper, th
 
 On Linux (cloud sessions, CI): `tools/setup_linux.sh` (ffmpeg from apt, venv, faster-whisper).
 
-Everything in the pipeline is free and runs on the Mac: ffmpeg, Whisper (mlx-whisper or WhisperX), OpenCV for face-centered reframing, Pillow for statics, and Claude Code as the editor's brain. No render API, no subscription, no upload of footage anywhere.
+Everything in the pipeline is free and runs on the Mac: ffmpeg, Whisper (mlx-whisper or WhisperX), headless Chromium (Playwright) for the motion graphics and captions, OpenCV for face-centered reframing, Pillow for statics, and Claude Code as the editor's brain. No render API, no subscription, no upload of footage anywhere.
 
 Then try the pipeline once with no footage: `.venv/bin/python tools/make_sample.py` writes a sample ad to `batches/<date>_SAMPLE_demo/exports/` using synthesized speech and placeholder visuals.
 
@@ -53,7 +53,9 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/transcribe.py` | Word-level transcripts (mlx-whisper, WhisperX, or faster-whisper, whichever is installed) |
 | `tools/selects.py` | Best take per script line from the transcripts, plus a draft EDL |
 | `tools/render.py` | EDL (yaml) to finished ad: reframe to 9:16 or 4:5 around the face, punch-ins, pause tightening, B-roll, hook text, lower third, ducked music, SFX, end card, two-pass loudness, captions. `--proxy` for rough cuts |
-| `tools/captions.py` | Caption file (.ass) from a transcript: chunk, highlight, karaoke, reveal, or hormozi style, inside the safe zone |
+| `tools/plates.py` | Motion plates: browser-rendered graphics (hook card, callouts, stat, compare, card, pip, lower third, end card, word-by-word captions) from one design system in `tools/plates/` |
+| `tools/sfx.py` | Synthesized default sound effects (pop, click, whoosh, ding, riser) until licensed ones are in `audio/sfx/` |
+| `tools/captions.py` | Caption file (.ass) from a transcript, the fast fallback engine: chunk, highlight, karaoke, reveal, or hormozi style |
 | `tools/statics.py` | Static image ads (4:5, 9:16) from a photo or a frame, headline + CTA inside the safe zone |
 | `tools/variants.py` | Single-variable versions of a hero ad (market, offer, hook, CTA) from one variants file; writes every EDL and a MATRIX.md |
 | `tools/review.py` | One-page local review site per batch (players, timelines, captions, QA, notes box) |

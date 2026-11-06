@@ -36,7 +36,8 @@ AI edits drift toward "busy and generic". These rules pull every ad toward one c
 
 - Cuts are the motion. Jump cuts on word boundaries every 2 to 4 s in the first 10 s, then every 3 to 6 s.
 - Punch-in alternation between 1.0 and 1.08 to 1.12. A push (`push`) only on stills and proof screenshots, 1.08 to 1.12 over the clip's length.
-- Text appears instantly (no fade-in) and leaves instantly. Caption words pop at most 8% for 90 ms (`highlight`, `reveal`, `hormozi` styles). No slides, no bounces, no spins.
+- Graphics enter with one spring pop (380 ms, slight overshoot) and leave with a short fade (250 ms); the hook card is the exception and is simply on from frame 1. Captions pop at most 6% per word. No slides across the frame, no spins, no bounces after the first settle.
+- Cards are rounded (28 px at 1920 tall), dark at 86% over footage, with one soft shadow. Accent only for the one card that carries the number or the offer.
 - B-roll: one insert per idea, 1.5 to 3 s, cut in on the word it illustrates, cut out before the next idea. Picture-in-picture for anything with text (screenshots), full frame for action footage.
 - No transitions between A-roll clips (hard cuts). No dissolves except on a still, never on faces.
 

@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.cmp { padding: .8em .9em .9em; width: calc(var(--W) - 2 * var(--safe-side) - 0.08 * var(--W)); font-size: calc({{size}}px * .62); font-weight: 700; }
+.cmp.in.center-x { animation-name: plate-in-x; } .cmp.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.title { font-size: {{size}}px; font-weight: 800; margin-bottom: .55em; letter-spacing: -0.01em; }
+.row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .5em; margin-top: .3em; }
+.bar { height: .95em; border-radius: .5em; background: rgba(255,255,255,.18); overflow: hidden; }
+.light .bar { background: rgba(15,17,21,.1); }
+.fill { height: 100%; border-radius: .5em; transform-origin: left; animation: grow 1s var(--ease-out) both; animation-delay: .25s; }
+.fill.a { background: var(--muted); } .light .fill.a { background: #9aa1ab; }
+.fill.b { background: var(--accent); animation-delay: .45s; }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.val { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.val.b { color: var(--accent); }
+.light .val.b { color: var(--accent); }
+.name { font-size: .85em; opacity: .85; margin-top: .5em; }
+.note { margin-top: .7em; font-size: calc({{size}}px * .4); color: var(--muted); font-weight: 700; }
+.light .note { color: rgba(15,17,21,.55); }
+</style></head><body><div class="stage">
+<div class="card cmp in out center-x {{variant}} {{pos}}" style="{{style}}">
+  <div class="title">{{title}}</div>
+  <div class="name">{{left_label}}</div>
+  <div class="row"><div class="bar"><div class="fill a" style="width: {{left_pct}}%"></div></div><div class="val a">{{left_value}}</div></div>
+  <div class="name" style="margin-top:.6em">{{right_label}}</div>
+  <div class="row"><div class="bar"><div class="fill b" style="width: {{right_pct}}%"></div></div><div class="val b">{{right_value}}</div></div>
+  <div class="note">{{note}}</div>
+</div>
+</div><script>{{harness}}</script></body></html>

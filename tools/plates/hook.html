@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.hook { padding: .35em .6em .4em; font-size: {{size}}px; font-weight: 800; line-height: 1.12; letter-spacing: -0.015em; text-align: center; white-space: pre-wrap; animation: hook-in .01s linear both, plate-out .25s ease-in both; animation-delay: 0s, calc(var(--dur) - .25s); }
+.hook.center-x { animation-name: hook-in, plate-out-x; }
+@keyframes hook-in { from { opacity: 1; } to { opacity: 1; } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, 0, 0); } to { opacity: 0; transform: translate3d(-50%, -12px, 0) scale(.96); } }
+.hook em { font-style: normal; color: var(--accent); }
+</style></head><body><div class="stage">
+<div class="card hook center-x pos-top {{variant}}">{{text}}</div>
+</div><script>{{harness}}</script></body></html>

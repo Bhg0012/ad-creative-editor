@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+@property --n { syntax: "<integer>"; initial-value: 0; inherits: false; }
+.stat { padding: .5em .9em .55em; text-align: center; min-width: 46%; }
+.stat.in.center-x { animation-name: plate-in-x; } .stat.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.num { font-size: {{size}}px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; --n: {{value}}; animation: count 1.1s var(--ease-out) both; animation-delay: .15s; counter-reset: n var(--n); }
+.num::after { content: "{{prefix}}" counter(n) "{{suffix}}"; }
+@keyframes count { from { --n: 0; } to { --n: {{value}}; } }
+.lbl { margin-top: .25em; font-size: calc({{size}}px * 0.34); font-weight: 700; color: var(--muted); }
+.light .lbl { color: rgba(15,17,21,.6); }
+</style></head><body><div class="stage">
+<div class="card stat in out center-x {{variant}} {{pos}}" style="{{style}}"><div class="num"></div><div class="lbl">{{label}}</div></div>
+</div><script>{{harness}}</script></body></html>
