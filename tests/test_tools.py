@@ -416,3 +416,12 @@ def test_find_font_prefers_brand_folder(tmp_path):
     assert exact and path.endswith("Montserrat-ExtraBold.ttf")
     path, exact = common.find_font("Montserrat ExtraBold", tmp_path / "nope")
     assert not exact
+
+
+def test_requirements_parse():
+    """A bad environment marker makes pip reject the whole file, which leaves the venv empty."""
+    from packaging.requirements import Requirement
+    for line in (ROOT / "requirements.txt").read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            Requirement(line)
