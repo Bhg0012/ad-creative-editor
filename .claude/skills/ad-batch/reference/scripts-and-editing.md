@@ -21,6 +21,7 @@ Script line format:
 
 - Pattern interrupt every 2-4s in the first 10s (cut, punch-in, B-roll, graphic, text change), then relax slightly. Match the VO's energy; fast is good, chaotic is not.
 - Every cut gets a 30 ms audio fade (render.py does it); cut on word boundaries, never inside a word, and leave 0.12 s of air at each tightened pause so breaths do not clip.
+- Editor reflexes are on by default (`config.yaml` `edit.*`): every pause over 0.45 s inside a clip is tightened, consecutive talking-head clips alternate 1.0 and 1.08 framing, every cut after the first opens 4% pushed in and settles over 0.25 s (a motion cut, not a static jump), and A-roll gets a light grade. Per clip: `tighten: 0`, `zoom: x`, `settle: 0` or `settle: 1.06` override. Graphics and their sounds cue 80 ms before the word (`graphics.lead_s`).
 - Punch-in zooms of 105-115% on emphasis words; alternate framing so jump cuts look intentional. Do not punch in past the footage's real resolution (soft faces kill trust).
 - B-roll and screen recordings show what the VO says ("a text goes out" -> show the phone receiving it).
 - Real footage and real client screenshots over stock. No AI-generated people, and nothing synthetic presented as real.

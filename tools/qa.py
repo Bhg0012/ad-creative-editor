@@ -276,9 +276,22 @@ def script_check_pages(pages_json: Path, script_path: Path) -> list[dict]:
 
 def sidecar_checks(sidecar: dict, duration: float) -> list[dict]:
     res = []
+    # Two graphics fighting for the same region at the same time is the fastest way to look machine-made.
+    gs = [g for g in sidecar.get("graphics", []) if g.get("region") in ("center", "top")]
+    clashes = []
+    for i in range(len(gs)):
+        for j in range(i + 1, len(gs)):
+            a, b = gs[i], gs[j]
+            if a["region"] == b["region"] and a["at"] < b["at"] + b["duration"] and b["at"] < a["at"] + a["duration"]:
+                clashes.append(f"{a['type']}@{a['at']}s and {b['type']}@{b['at']}s")
+    res.append(check("one graphic per region at a time", "PASS" if not clashes else "FAIL",
+                     "ok" if not clashes else "overlapping: " + "; ".join(clashes[:4])))
+    short = [g for g in sidecar.get("graphics", []) if g["type"] in ("label", "stat", "compare", "card", "callout") and g["duration"] < 1.4]
+    res.append(check("graphics stay up long enough to read", "PASS" if not short else "WARN",
+                     "ok" if not short else f"{len(short)} graphics under 1.4 s"))
     hook = next((g for g in sidecar.get("graphics", []) if g["type"] in ("hook_text", "hook") and g["at"] == 0.0), None)
     res.append(check("headline on frame 1", "PASS" if hook else "WARN",
-                     f'"{hook["text"]}" for {hook["duration"]}s' if hook else "no hook_text in the EDL; the text hook must be on screen from frame 1"))
+                     f'"{hook.get("text", "")}" for {hook["duration"]}s' if hook else "no hook_text in the EDL; the text hook must be on screen from frame 1"))
     res.append(check("duration for all placements", "PASS" if duration <= MAX_SECONDS_ALL_PLACEMENTS else "WARN",
                      f"{duration:.1f}s (keep under {MAX_SECONDS_ALL_PLACEMENTS}s so every placement is eligible)"))
     if not any(c.get("src") == "end_card" for c in sidecar.get("clips", [])):
