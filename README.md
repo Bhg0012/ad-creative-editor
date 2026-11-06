@@ -11,6 +11,8 @@ git clone <this repo> && cd ad-creative-editor
 tools/setup_mac.sh          # installs ffmpeg-full, Python venv, mlx-whisper, then runs the doctor
 ```
 
+On Linux (cloud sessions, CI): `tools/setup_linux.sh` (ffmpeg from apt, venv, faster-whisper).
+
 Everything in the pipeline is free and runs on the Mac: ffmpeg, Whisper (mlx-whisper or WhisperX), OpenCV for face-centered reframing, Pillow for statics, and Claude Code as the editor's brain. No render API, no subscription, no upload of footage anywhere.
 
 Then:
@@ -53,8 +55,9 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/statics.py` | Static image ads (4:5, 9:16) from a photo or a frame, headline + CTA inside the safe zone |
 | `tools/variants.py` | Single-variable versions of a hero ad (market, offer, hook, CTA) from one variants file; writes every EDL and a MATRIX.md |
 | `tools/review.py` | One-page local review site per batch (players, timelines, captions, QA, notes box) |
+| `tools/lint_copy.py` | Lints copy files, EDL texts and captions for em dashes, jargon, personal-attribute wording, unproven claims, fake urgency, unlabeled numbers, and length limits |
 | `tools/qa.py` | Spec, loudness, black-frame, silent-open, opening-similarity, caption geometry, headline, face, duration and script-match checks plus evidence images |
-| `tools/metrics.py` | Hook rate, hold rate, CTR, CPL, verdicts, and grouping by angle / hook / length / ratio |
+| `tools/metrics.py` | Hook rate, hold rate, CTR, CPL, verdicts, grouping by angle / hook / length / ratio, and 7-day fatigue reads; reads CSV or a Meta Ads MCP JSON pull |
 
 Run the tests with `.venv/bin/python -m pytest -q`.
 
