@@ -6,6 +6,8 @@ audio/sfx/*
 audio/vo/*
 !audio/**/.gitkeep
 brand/fonts/*
+!brand/fonts/Montserrat-*.ttf
+!brand/FONT-LICENSE-Montserrat-OFL.txt
 !brand/fonts/.gitkeep
 brand/proof/
 batches/*/work/

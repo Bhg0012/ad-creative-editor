@@ -9,7 +9,7 @@ business:
   brand_colors:
     primary: "#3B96F6"
     accent: "#E55B13"
-  fonts: TBD                   # font files in ./brand/fonts (e.g. Montserrat-ExtraBold.ttf). Must be licensed for commercial use.
+  fonts: [Montserrat-ExtraBold.ttf, Montserrat-Black.ttf, Montserrat-Bold.ttf, Montserrat-SemiBold.ttf]   # in ./brand/fonts, SIL Open Font License (brand/FONT-LICENSE-Montserrat-OFL.txt), free for commercial use
   caption_font_name: Montserrat ExtraBold   # family name as installed; used for burned-in captions
   logo: ./brand/logo.png       # optional
 
