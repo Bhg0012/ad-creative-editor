@@ -87,20 +87,32 @@ def build_voice(sentences: list[list[str]], tmp: Path, out_wav: Path) -> list[di
 def placeholder_take(voice_wav: Path, out: Path, size: str, label: str, colors: tuple[str, str], font: str) -> None:
     w, h = (int(x) for x in size.split("x"))
     d = duration(voice_wav)
+    # Text goes through files: colons and commas inside drawtext text= break newer ffmpeg filter parsers.
+    label_f = out.with_suffix(".label.txt")
+    label_f.write_text(label)
+    sub_f = out.with_suffix(".sub.txt")
+    sub_f.write_text("STAND-IN FOOTAGE")
     head = f"drawbox=x=(iw-{w // 4})/2:y=ih*0.22:w={w // 4}:h={h // 2}:color=white@0.18:t=fill"
-    txt = (f"drawtext=fontfile='{font}':text='{label}':fontsize={h // 22}:fontcolor=white@0.9:x=(w-text_w)/2:y=h*0.80,"
-           f"drawtext=fontfile='{font}':text='STAND-IN FOOTAGE':fontsize={h // 30}:fontcolor=white@0.6:x=(w-text_w)/2:y=h*0.80+{h // 16}")
+    txt = (f"drawtext=fontfile='{font}':textfile='{label_f}':fontsize={h // 22}:fontcolor=white@0.9:x=(w-text_w)/2:y=h*0.80,"
+           f"drawtext=fontfile='{font}':textfile='{sub_f}':fontsize={h // 30}:fontcolor=white@0.6:x=(w-text_w)/2:y=h*0.80+{h // 16}")
     run_ffmpeg(["-f", "lavfi", "-t", f"{d:.3f}", "-i", f"gradients=s={size}:c0=0x{colors[0]}:c1=0x{colors[1]}:nb_colors=2:speed=0.015:r=30",
                 "-i", str(voice_wav), "-vf", f"{head},{txt},format=yuv420p", "-c:v", "libx264", "-preset", "fast", "-crf", "18",
                 "-c:a", "aac", "-b:a", "192k", "-shortest", str(out)])
+    label_f.unlink()
+    sub_f.unlink()
 
 
 def mock_broll(out: Path, font: str) -> None:
+    t1_f, t2_f = out.with_suffix(".t1.txt"), out.with_suffix(".t2.txt")
+    t1_f.write_text("Review request sent")
+    t2_f.write_text("to Mike T. (example)")
     box = "drawbox=x=90:y=760:w=900:h=300:color=white@0.95:t=fill"
-    t1 = f"drawtext=fontfile='{font}':text='Review request sent':fontsize=58:fontcolor=0x1f2a44:x=140:y=820"
-    t2 = f"drawtext=fontfile='{font}':text='to Mike T. (example)':fontsize=44:fontcolor=0x3B96F6:x=140:y=920"
+    t1 = f"drawtext=fontfile='{font}':textfile='{t1_f}':fontsize=58:fontcolor=0x1f2a44:x=140:y=820"
+    t2 = f"drawtext=fontfile='{font}':textfile='{t2_f}':fontsize=44:fontcolor=0x3B96F6:x=140:y=920"
     run_ffmpeg(["-f", "lavfi", "-t", "3", "-i", "color=c=0x101522:s=1080x1920:r=30", "-vf", f"{box},{t1},{t2},format=yuv420p",
                 "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-an", str(out)])
+    t1_f.unlink()
+    t2_f.unlink()
 
 
 def mock_still(out: Path, font: str) -> None:
