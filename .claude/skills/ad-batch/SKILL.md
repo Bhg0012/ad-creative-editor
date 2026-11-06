@@ -14,6 +14,7 @@ Reference files (read when the stage needs them):
 - `reference/copy-package.md`: primary text, headlines, CTA, Instant Form
 - `reference/launch.md`: campaign structure, pre-publish audit, kill/keep rules
 - `reference/edit-checklist.md`: what a trained editor checks by eye on every render before a gate
+- `reference/visual-style.md`: the one look every ad follows (bands, type sizes, colors, motion, sound, first-frame rules)
 
 ## Stage 0: start or resume
 
@@ -106,7 +107,7 @@ Size the batch to the budget: each live ad needs enough spend to be judged (see 
 
 ## Stage 6: full edit
 
-Follow `reference/scripts-and-editing.md` for cadence, captions, graphics, sound, and render settings. The render is three commands per ad:
+Follow `reference/visual-style.md` for the look and `reference/scripts-and-editing.md` for cadence, captions, graphics, sound, and render settings. The render is three commands per ad:
 
 1. `.venv/bin/python tools/render.py work/edl/<adname>.yaml` renders `work/cuts/<adname>_master.mp4` (reframed, graded, B-roll, hook text, lower third, music ducked under the voice, SFX, two-pass loudness) with no captions yet.
 2. `.venv/bin/python tools/transcribe.py work/cuts/<adname>_master.mp4 --out work/transcripts` (or add `--captions auto` to step 1 when a backend is installed).
