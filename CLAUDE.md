@@ -64,4 +64,4 @@ If a push or merge fails (network, conflicts you cannot resolve safely, branch p
 | `batches/<date>_<market>_<offer>/` | one batch: brief, work, graphics, exports, statics, qa, BATCH.md |
 | `raw/`, `audio/`, `brand/` | footage library, licensed audio, fonts/logo/proof (not in git) |
 | `data/` | ad exports and analysis (not in git) |
-| `tools/` | doctor, new_batch, inventory, transcribe, selects, render (EDL to finished ad), captions, statics, qa, metrics |
+| `tools/` | doctor, new_batch, inventory, transcribe, selects, render (EDL to finished ad), variants, captions, statics, qa, review, metrics |

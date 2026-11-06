@@ -20,6 +20,7 @@ Script line format:
 ## Visual cadence
 
 - Pattern interrupt every 2-4s in the first 10s (cut, punch-in, B-roll, graphic, text change), then relax slightly. Match the VO's energy; fast is good, chaotic is not.
+- Every cut gets a 30 ms audio fade (render.py does it); cut on word boundaries, never inside a word, and leave 0.12 s of air at each tightened pause so breaths do not clip.
 - Punch-in zooms of 105-115% on emphasis words; alternate framing so jump cuts look intentional. Do not punch in past the footage's real resolution (soft faces kill trust).
 - B-roll and screen recordings show what the VO says ("a text goes out" -> show the phone receiving it).
 - Real footage and real client screenshots over stock. No AI-generated people, and nothing synthetic presented as real.
@@ -33,12 +34,15 @@ Every ad is described by `work/edl/<adname>.yaml` (print a template with `tools/
 | Key | What it does |
 |---|---|
 | `clips[]` | A-roll in order: `src`, `in`, `out` (seconds in the source); `zoom` (static punch-in, 1.05-1.15), `push` (slow push to this factor), `focus: auto` (face-centered reframe) or `[x, y]`, `tighten: 0.45` (shorten internal pauses longer than 0.45s, leaving 0.12s each side). A still image takes `duration` instead of in/out. |
-| `broll[]` | Picture-only overlays: `src`, `at`, `duration`, `src_in`, optional `label` text. The voice keeps playing. |
+| `broll[]` | Picture-only overlays: `src`, `at`, `duration`, `src_in`, optional `label` text. The voice keeps playing. Add `pip: {w: 0.7, x: 0.5, y: 0.4}` for a picture-in-picture inset (screenshots, phone photos, HEIC is fine) instead of full frame. |
+| `callouts[]` | Short on-screen text mid-video: `text`, `at`, `duration`, `position` (top, center, lower), `accent: true` for the orange box. Use for the number, the re-hook, the offer line. Always labeled "(example)" when the number is not real. |
+| `slot` on a clip | A name (`hook`, `offer`, `cta`) that `tools/variants.py` can swap. |
+| `look` | Optional light grade for A-roll: `contrast`, `brightness`, `saturation`, `gamma`, `sharpen`. Keep it subtle (1.03-1.08); phone footage is already contrasty. |
 | `hook_text`, `hook_text_seconds` | Headline from frame 1, inside the top safe zone, with a dark box. Max about 7 words. |
 | `lower_third` | `text`, `at`, `duration`: name + "Auburn, AL" in the accent color, above the caption band. |
 | `music` | `src`, `gain_db` (default -18), `duck: true` (sidechain under the voice), `fade_out`. Loops if shorter than the ad. |
 | `sfx[]` | `src`, `at`, `gain_db`. |
-| `end_card` | `text`, `subtext`, `seconds`, `logo`: brand-primary card with the exact CTA. |
+| `end_card` | `headline` (optional promise line), `text` (the CTA, drawn as an accent pill button), `subtext`, `seconds`, `logo`: brand-primary card with the exact action. |
 
 The output sidecar `exports/<adname>.render.json` lists where every clip, overlay, and graphic landed on the timeline.
 

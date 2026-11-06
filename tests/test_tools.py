@@ -284,6 +284,16 @@ def footage(tmp_path_factory):
     ff("-f", "lavfi", "-i", "color=c=green:s=1280x720:rate=24:duration=3", "-c:v", "libx264", "-pix_fmt", "yuv420p",
        "-an", str(b / "raw" / "broll.mp4"))
     ff("-f", "lavfi", "-i", "color=c=orange:s=800x600:d=1", "-frames:v", "1", str(b / "raw" / "still.png"))
+    import pillow_heif
+    from PIL import Image
+    pillow_heif.register_heif_opener()
+    Image.new("RGB", (600, 400), (200, 40, 40)).save(b / "raw" / "photo.heic", quality=80)
+    # rotated phone clip: stored landscape with a 90 degree display rotation (what iPhones write)
+    ff("-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30:duration=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an", str(b / "raw" / "flat.mp4"))
+    ff("-display_rotation", "90", "-i", str(b / "raw" / "flat.mp4"), "-c", "copy", str(b / "raw" / "rotated.mp4"))
+    # HDR-tagged clip (HLG transfer) to exercise the tonemap chain
+    ff("-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30:duration=1", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+       "-color_primaries", "bt2020", "-color_trc", "arib-std-b67", "-colorspace", "bt2020nc", "-an", str(b / "raw" / "hdr.mp4"))
     ff("-f", "lavfi", "-i", "sine=frequency=110:sample_rate=48000:duration=3", "-af", "volume=0.5",
        "-c:a", "libmp3lame", str(b / "audio" / "music.mp3"))
     ff("-f", "lavfi", "-i", "sine=frequency=2000:sample_rate=48000:duration=0.2", str(b / "audio" / "whoosh.wav"))
@@ -300,6 +310,10 @@ clips:
   - {src: raw/still.png, duration: 1.0, push: 1.1}
 broll:
   - {src: raw/broll.mp4, at: 1.0, duration: 1.0, label: "A text goes out"}
+  - {src: raw/photo.heic, at: 5.6, duration: 0.8, pip: {w: 0.6, x: 0.5, y: 0.4}}
+callouts:
+  - {text: "$4,800 job (example)", at: 3.0, duration: 1.0, accent: true}
+look: {contrast: 1.03, saturation: 1.05, sharpen: true}
 lower_third: {text: "Bruce, Auburn AL", at: 0.5, duration: 1.5}
 music: {src: audio/music.mp3, gain_db: -16, duck: true}
 sfx:
@@ -309,9 +323,9 @@ end_card: {text: "Tap Learn More", subtext: "Huntsville contractors", seconds: 1
     return b
 
 
-def mean_rgb(video: Path, t: float) -> tuple[float, float, float]:
+def mean_rgb(video: Path, t: float, crop: str = "crop=iw*0.6:ih*0.3:iw*0.2:ih*0.4") -> tuple[float, float, float]:
     raw = subprocess.run([FF, "-nostdin", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
-                          "-vf", "crop=iw*0.6:ih*0.3:iw*0.2:ih*0.4,scale=8:8", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                          "-vf", f"{crop},scale=8:8", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                          capture_output=True).stdout
     px = [raw[i:i + 3] for i in range(0, len(raw), 3)]
     return tuple(sum(p[c] for p in px) / len(px) for c in range(3))
@@ -365,6 +379,10 @@ def test_render_proxy_and_final(footage):
     assert [c["src"] for c in sidecar["clips"]][-1] == "end_card"
     assert sidecar["broll"][0]["at"] == 1.0 and sidecar["graphics"][0]["type"] == "hook_text"
     assert len(sidecar["clips"]) == 6  # the tightened clip became two segments
+    assert [g["type"] for g in sidecar["graphics"]] == ["hook_text", "callout", "lower_third"]
+    assert sidecar["broll"][1]["pip"] is True
+    r, g, b = mean_rgb(final, 6.0, "crop=iw*0.4:ih*0.14:iw*0.3:ih*0.33")   # inside the pip of the red HEIC photo
+    assert r > 120 and r > 2 * g and r > 2 * b, (r, g, b)
     s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
     assert not [k for k, v in s.items() if v == "FAIL"], s
     feed = render.render(edl, "4:5", None, proxy=True, keep_tmp=False, out_dir=None)
@@ -425,3 +443,90 @@ def test_requirements_parse():
         line = line.split("#", 1)[0].strip()
         if line:
             Requirement(line)
+
+
+import variants  # noqa: E402
+import review  # noqa: E402
+
+
+def test_render_handles_rotated_and_hdr_sources(footage):
+    edl = footage / "work" / "edl" / "T_offer_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: T_offer_angle_hook_5s_9x16_v1
+clips:
+  - {src: raw/rotated.mp4, in: 0.0, out: 1.0}
+  - {src: raw/hdr.mp4, in: 0.0, out: 0.5, zoom: 1.1}
+""")
+    out = render.render(edl, None, None, proxy=True, keep_tmp=False, out_dir=None)
+    v = common.video_stream(common.probe(out))
+    assert (int(v["width"]), int(v["height"])) == (540, 960)
+    # the rotated source is displayed portrait, so the crop keeps (almost) its full width
+    tl = render.timeline_of(edl)
+    assert [c["src"] for c in tl] == ["raw/rotated.mp4", "raw/hdr.mp4"]
+    assert render.crop_box(1080, 1920, "9:16", (0.5, 0.5), 1.0)[0] == 1080
+
+
+def test_variants_matrix(footage):
+    base = footage / "work" / "edl" / "HSV_reviews_lostjobs_question_10s_9x16_v1.yaml"
+    base.write_text("""
+name: HSV_reviews_lostjobs_question_10s_9x16_v1
+hook_text: "Huntsville roofers?"
+clips:
+  - {src: raw/landscape.mp4, in: 1.0, out: 2.0, slot: hook}
+  - {src: raw/portrait.mp4, in: 0.0, out: 1.0, slot: offer}
+lower_third: {text: "Bruce", at: 0.2, duration: 1.0}
+end_card: {text: "Tap Learn More", subtext: "Huntsville", seconds: 1.0}
+""")
+    spec = footage / "work" / "edl" / "HSV_reviews_lostjobs_question_10s_9x16_v1.variants.yaml"
+    spec.write_text("""
+base: HSV_reviews_lostjobs_question_10s_9x16_v1.yaml
+ratios: ["9:16"]
+dimensions:
+  market:
+    HSV: {hook_text: "Huntsville roofers?", end_card: {subtext: "Huntsville"}}
+    AUB: {hook_text: "Auburn roofers?", slots: {hook: {src: raw/landscape.mp4, in: 3.0, out: 4.0}}, end_card: {subtext: "Auburn"}}
+  price:
+    p497: {slots: {offer: {in: 1.0, out: 2.0}}, callouts: [{text: "$497 (example)", at: 0.2, duration: 0.5}]}
+    free: {remove: [lower_third]}
+skip:
+  - {market: AUB, price: free}
+""")
+    rows = variants.materialize(spec)
+    names = [r["name"] for r in rows]
+    assert names == ["HSV_reviews_lostjobs-p497_question_10s_9x16_v1", "HSV_reviews_lostjobs-free_question_10s_9x16_v1",
+                     "AUB_reviews_lostjobs-p497_question_10s_9x16_v1"]
+    aub = common.load_yaml(rows[2]["path"])
+    assert aub["hook_text"] == "Auburn roofers?" and aub["clips"][0]["in"] == 3.0 and aub["end_card"]["subtext"] == "Auburn"
+    assert aub["clips"][1]["in"] == 1.0 and aub["callouts"][0]["text"].startswith("$497")
+    free = common.load_yaml(rows[1]["path"])
+    assert "lower_third" not in free and "callouts" not in free
+    assert (spec.parent / "variants" / "MATRIX.md").read_text().count("| HSV_") == 2
+    out = render.render(rows[2]["path"], "9:16", None, proxy=True, keep_tmp=False, out_dir=None)
+    assert out.name.startswith("AUB_reviews_lostjobs-p497")
+    with pytest.raises(SystemExit):
+        variants.deep_merge({"clips": [{"slot": "hook"}]}, {"slots": {"nope": {}}})
+
+
+def test_qa_sidecar_checks_and_review_page(footage):
+    final = next((footage / "exports").glob("TEST_offer_angle_question_10s_9x16_v1.mp4"))
+    script = footage / "script.txt"
+    script.write_text("Huntsville roofers, your competitor has 140 reviews.\nA line that is not in the ad.\n")
+    r = qa.qa_one(final, footage / "qa", -14, -1.0, script)
+    s = statuses(r)
+    assert s["headline on frame 1"] == "PASS" and s["end card with CTA"] == "PASS"
+    assert s["captions above bottom safe zone"] == "PASS" and s["caption width inside safe sides"] == "PASS"
+    assert s["captions match script"] == "WARN"          # one of two lines is not in the captions
+    assert s["face in hook (first 1.5s)"] == "WARN"      # synthetic footage has no face
+    page = review.build(footage)
+    html_text = page.read_text()
+    assert "TEST_offer_angle_question_10s_9x16_v1.mp4" in html_text and "Timeline" in html_text and "QA:" in html_text
+
+
+def test_inventory_sheets(footage, tmp_path):
+    import unittest.mock as um
+    with um.patch.object(sys, "argv", ["inventory.py", "--raw", str(footage / "raw"), "--out", str(tmp_path / "inv.csv"),
+                                       "--sheets", str(tmp_path / "sheets")]):
+        assert inventory.main() == 0
+    assert (tmp_path / "sheets" / "landscape.png").stat().st_size > 0
+    rows = (tmp_path / "inv.csv").read_text()
+    assert "photo.heic" in rows and "rotated.mp4" in rows

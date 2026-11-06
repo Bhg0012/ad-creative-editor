@@ -88,13 +88,15 @@ Size the batch to the budget: each live ad needs enough spend to be judged (see 
 
 **4c. Shot list (`brief/09_shotlist.md`)** for footage Bruce still needs: shot, framing, location, lighting note, line to say, number of takes, alternate hooks to record back-to-back. Prefer phone-native, UGC-style framing for trust. Vary locations, outfits, and backgrounds across angles so concepts are visually distinct.
 
+**4d. Variant takes.** If `batch_defaults.variants.enabled` is yes in `config.yaml`, add to the shot list one extra take per enabled dimension for each hero script: a market dimension needs the hook line said once per market ("Huntsville roofers" / "Auburn roofers"), an offer dimension needs the offer line said once per offer or price, a hook dimension needs 2-3 alternate opening lines on the same body, a cta dimension needs the ask said each way. Record them back to back in the same setup so everything but the swapped line stays identical. Write the planned matrix (dimensions x values) at the end of `brief/08_scripts.md`.
+
 **GATE 4:** hooks with scores and full scripts. If filming is needed, stop until footage is in `raw/`.
 
 ## Stage 5: ingest and rough cut
 
-1. **Inventory:** `.venv/bin/python tools/inventory.py --raw raw --out work/inventory.csv`. Note flags (variable frame rate, HDR, below 1080p); `tools/render.py` converts VFR to constant and HDR to SDR per clip, so just know which clips are soft.
+1. **Inventory:** `.venv/bin/python tools/inventory.py --raw raw --out work/inventory.csv --sheets work/sheets`. Note flags (variable frame rate, HDR, below 1080p); `tools/render.py` converts VFR to constant and HDR to SDR per clip and reads HEIC photos, so just know which clips are soft.
 2. **Transcribe:** `.venv/bin/python tools/transcribe.py raw/<files> --out work/transcripts` (word-level JSON + SRT + TXT; picks mlx-whisper, WhisperX, or faster-whisper, whichever is installed). Check low-confidence words by ear.
-3. **Look at the footage:** contact sheets (1 frame per 2s) into `work/`, then view them. Tag each clip: framing, setting, energy, problems (blur, bad light, wind noise).
+3. **Look at the footage:** view every contact sheet in `work/sheets/` (1 frame per 2 s with timecodes). Tag each clip in `work/selects.md`: framing, setting, energy, problems (blur, bad light, wind noise), and which B-roll shows what.
 4. **Selects:** `.venv/bin/python tools/selects.py --script brief/08_scripts.md --transcripts work/transcripts --out work/selects.md --edl work/edl/<adname>.yaml --name <adname>` finds the best take per script line (top 3 candidates with scores) and writes a draft EDL. Lines reported NOT FOUND need filming or rewriting. Pick takes on correct words, best delivery, no stumbles; energy and clarity over perfection.
 5. **EDL per ad (`work/edl/<adname>.yaml`):** the single source of truth for the cut (see `tools/render.py --example`): A-roll clips with in/out, `zoom` or `push`, `tighten` to shorten pauses (gaps, never words), B-roll windows, hook text, lower third, music, SFX, end card. Every later revision edits this file, never the MP4. Remove dead air, breaths between sentences, ums, restarts. Never speed up speech.
 6. **Rough cut proxies:** `.venv/bin/python tools/render.py work/edl/<adname>.yaml --proxy` (540 px, timecode burned, no music or graphics) into `work/proxies/`.
@@ -116,7 +118,11 @@ Key points:
 - Mix to the loudness target in `config.yaml`, verified by `tools/qa.py`.
 - Must make complete sense with sound off, and with eyes closed.
 
-**Variants:** after the hero is approved, make variants that are meaningfully different: (1) different visual hook (shot, setting, format), not just different text; (2) different length (15s cut-down); (3) different format (talking head vs screen-recording-led vs text on B-roll vs static); (4) aspect ratios: `tools/render.py <edl> --ratio 4:5 --captions ...` reframes the same EDL for Feed around the speaker's face (`focus: auto`), never letterboxed. Label each as `new` or `iteration` in `DECISIONS.md`.
+**Self-review loop (every render, before Bruce sees it):** render, then look at the QA evidence (first frame, safe-zone frames, contact sheet, mobile frames) and the `.render.json`, fix the EDL, re-render. Up to three passes. Typical fixes: hook text wraps to three lines (shorten it), caption page clashes with the lower third (move `lower_third.at`), B-roll covers the speaker during the CTA (shorten `duration`), zoom alternation missing (set `zoom` on every other clip), music audible over speech (lower `gain_db`).
+
+**Single-variable versions (`tools/variants.py`):** when `batch_defaults.variants.enabled` is yes, write `work/edl/<hero>.variants.yaml` next to the approved hero EDL (format in the tool's docstring): the hero's swap-able clips carry `slot: hook`, `slot: offer`, `slot: cta`, and each dimension value patches `hook_text`, the slot clip, callouts, or the end card. Run `.venv/bin/python tools/variants.py <file>` to write the EDLs and `work/edl/variants/MATRIX.md`, proxy-check two of them, then `--render --captions auto` for all. Log every variant in `DECISIONS.md` as `iteration` of the hero. Variants are not concept diversity: they still count as one concept for Meta's similarity grouping, so the batch also needs its genuinely different concepts below.
+
+**Variants that are new concepts:** after the hero is approved, make variants that are meaningfully different: (1) different visual hook (shot, setting, format), not just different text; (2) different length (15s cut-down); (3) different format (talking head vs screen-recording-led vs text on B-roll vs static); (4) aspect ratios: `tools/render.py <edl> --ratio 4:5 --captions ...` reframes the same EDL for Feed around the speaker's face (`focus: auto`), never letterboxed. Label each as `new` or `iteration` in `DECISIONS.md`.
 
 **Statics** (if `also_make_statics`): 2-3 per batch with `.venv/bin/python tools/statics.py --image <real photo or proof screenshot> | --frame-from <master.mp4> --at <s> --headline "..." --sub "..." --cta "Tap Learn More" --ratio 4:5 --out statics/<name>_4x5_v1.png` (and `--ratio 9:16`). One message, one CTA, headline inside the safe zone.
 
@@ -128,14 +134,16 @@ For every ad, write `exports/<adname>_copy.md` per `reference/copy-package.md`. 
 
 ## Stage 8: QA (before Bruce sees anything)
 
-1. Run `.venv/bin/python tools/qa.py exports/*.mp4 --qa-dir qa`. It checks specs, loudness, black frames, silent openings, and opening similarity, and writes evidence images. Read each ad's `exports/<adname>.render.json` to know what should be on screen when.
+1. Run `.venv/bin/python tools/qa.py exports/*.mp4 --qa-dir qa --script brief/08_scripts.md`. It checks specs, loudness, black frames, silent openings, opening similarity, caption geometry against the safe zone, caption and lower-third overlap, headline on frame 1, a face in the hook and the CTA, duration guidance, and that every script line is heard in the captions. It writes evidence images. Read each ad's `exports/<adname>.render.json` to know what should be on screen when.
 2. Open and look at every evidence image: contact sheet, first frame (would it stop a scroll as a still?), safe-zone frames, mobile 360px frames.
 3. Diff burned-in captions against the transcript; spell-check and fact-check every on-screen word.
 4. Run the compliance checklist from `reference/compliance.md` line by line, per ad.
 5. Hook audit: no two concepts share the same opening shot plus opening line.
 6. Mark every MANUAL row in `qa/REPORT.md` PASS or FAIL. Fix and re-run until nothing fails. Never deliver a failing ad.
 
-**GATE 7:** deliver the batch: all videos, statics, copy files, and the QA report.
+7. Build the review page: `.venv/bin/python tools/review.py batches/<id>` writes `review/index.html` (players, timelines, captions, QA, copy, a notes box per ad). Bruce can open it on his phone with `python3 -m http.server 8000` from the batch folder.
+
+**GATE 7:** deliver the batch: all videos, statics, copy files, the QA report, and the review page.
 
 ## Stage 9: launch plan
 

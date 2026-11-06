@@ -69,3 +69,14 @@ batch_defaults:
   lengths_seconds: [15, 30, 45]
   aspect_ratios: ["9:16", "4:5"]   # 9:16 for Reels/Stories, 4:5 for Feed. Add "1:1" only if needed.
   also_make_statics: yes       # 2-3 static image ads per batch
+  # Versions of each hero ad with ONE thing swapped (tools/variants.py). Turn a dimension on and
+  # the shot list asks for the extra takes (one hook line per market, one offer line per price,
+  # etc.), the EDL marks those clips with `slot:`, and every combination renders on its own.
+  variants:
+    enabled: no                # yes = build the variant matrix for every approved hero ad
+    dimensions:                # which single-variable swaps to produce
+      market: no               # Huntsville vs Auburn-Opelika call-outs (hook line, headline, end card)
+      offer: no                # different offer or price line (the `offer` slot clip, callout)
+      hook: no                 # alternate opening line and shot on the same body (the `hook` slot)
+      cta: no                  # different ask or end card text
+    all_ratios: yes            # every variant in every ratio from aspect_ratios
