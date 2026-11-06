@@ -44,7 +44,10 @@ def say(text: str, out_wav: Path) -> None:
         run_ffmpeg(["-i", str(aiff), "-ar", "48000", "-ac", "1", str(out_wav)])
         aiff.unlink()
     else:
-        run_ffmpeg(["-f", "lavfi", "-i", f"flite=text='{text}':voice=rms", "-ar", "48000", "-ac", "1", str(out_wav)])
+        tf = out_wav.with_suffix(".txt")
+        tf.write_text(text)
+        run_ffmpeg(["-f", "lavfi", "-i", f"flite=textfile={tf}:voice=rms", "-ar", "48000", "-ac", "1", str(out_wav)])
+        tf.unlink()
 
 
 def duration(path: Path) -> float:
