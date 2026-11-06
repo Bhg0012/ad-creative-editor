@@ -139,3 +139,28 @@ Prices are Anthropic's first-party API rates as cached in the Claude API skill o
 Machine time on an M-series Mac (approximate): proxy 10 to 20 s, master 30 to 60 s, transcription of the master 10 to 30 s with mlx-whisper, captioned final 30 to 60 s, QA 20 s. Under three minutes of rendering per ad end to end.
 
 Claude's working time: the first hero ad from an approved script, including footage review, selects, EDL, two or three self-review passes, and QA, runs 10 to 20 minutes of session time. Each variant is 1 to 3 minutes, mostly render time. A full batch (research, angles, offer, hooks and scripts, six concepts, variants, copy, QA, launch plan) is 2 to 4 hours of session time spread across the gates, because every gate waits for your yes. Filming and your review cycles dominate the calendar, not the editor.
+
+## 9. Update 2026-11-06 (evening): what five "Claude video editor" videos teach, and the motion layer built from it
+
+Bruce supplied transcripts of five YouTube walkthroughs (a Higgsfield-sponsored editor, Matt Wolfe's short-form workflow with vidIQ and HyperFrames, a no-code creator's seven-job system with Parakeet and HyperFrames, a former Apple/PlayStation editor's six-job skill, and Ali Abdaal's day-long test of DaVinci Resolve, HyperFrames and Remotion). Face swaps, outfit changes, AI b-roll generators and paid sound libraries were set aside on purpose. What is left is consistent across all five:
+
+1. **The look comes from graphics as code.** Every polished example renders its titles, callouts, cards and captions in a browser (HyperFrames or Remotion) with real easing, rounded cards, shadows and a consistent design system, then composites them over the cut. Flat text drawn by the cutter is what "cheap AI edit" looks like. Abdaal's name for the unit is a motion plate: a 3 to 8 second self-contained graphic rendered with transparency and dropped over the A-cut.
+2. **Plan before building.** A beat map (every idea, what is on screen while it is said) and a storyboard or contact sheet get approved before any graphic renders. One graphic per idea, held long enough to read; not one per sentence.
+3. **Sound carries the polish.** A pop, click or whoosh on every graphic entrance, music ducked under speech, a suspenseful hook bed then a low upbeat bed. The editors spent as long tuning sounds as visuals.
+4. **Cut from transcript plus waveform.** Never cut inside a word; pad cut edges for timestamp drift; keep the last clean take of each line.
+5. **Check like a person, 10 frames a second**, for six mistakes: an animation that plays twice, a graphic that flashes for a split second, text that lands too late to read, a graphic on the face, a word said twice, lips drifting from the voice.
+6. **Every note becomes a rule.** Feedback goes back into the skill file; the editor finds the instruction that should have prevented the mistake and rewrites it. Five months of notes made the good ones good.
+7. **Thinking models direct, cheaper models build; drafts render at half size; full quality only after approval.** One editor's long-form video cost about 600 million tokens (about $160 at API prices) and six hours; shorts cost far less.
+
+What changed in the engine today, from those lessons:
+
+| Lesson | Built |
+|---|---|
+| Graphics as code | `tools/plates.py` plus `tools/plates/*.html` and `theme.css`: hook card, label, stat count-up, compare bars, ticked card, photo or screenshot inset with phone bezel, lower third, animated end card with a pulsing CTA, and word-by-word captions (pill, highlight, clean). Rendered frame by frame in headless Chromium with alpha, composited by `tools/render.py`. One theme file restyles everything. |
+| Plan before building | `tools/render.py --storyboard` tiles every graphic over the frame it sits on in seconds; the skill adds a beat map step and makes the storyboard part of Gate 5. |
+| Sound | `graphics.auto_sfx` puts a pop, click, whoosh, ding or riser on every graphic entrance from `audio/sfx/` or synthesized defaults (`tools/sfx.py`). |
+| Ten-frames-a-second review | `tools/qa.py` scans at 10 fps for flash frames and frozen stretches and checks center graphics against the detected face; the skill lists the six mistakes for the eye check. |
+| Notes become rules | The skill now requires finding and rewriting the instruction that should have prevented each note, not just logging it. |
+| References | `brand/references/` plus `brand/DESIGN.md`: screenshots of ads Bruce likes become theme and style-guide edits, never one-off styling. |
+
+Not adopted, and why: face, outfit and background swaps (trust-killing for a local founder brand, and a compliance risk); AI-generated b-roll of jobs or customers (same); DaVinci Resolve or Premiere control through MCP (the A-cut is better done from word timings with ffmpeg, which Abdaal's own test confirmed); paid sound libraries (bring one later if the synthesized defaults are not enough; the engine looks in `audio/sfx/` first).

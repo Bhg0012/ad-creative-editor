@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.cap { position: absolute; left: var(--safe-side); right: var(--safe-side); bottom: calc(var(--safe-bottom) + .02 * var(--H)); height: 0; text-align: center; }
+.page { position: absolute; left: 0; right: 0; bottom: 0; opacity: 0; font-size: {{size}}px; font-weight: 800; line-height: 1.22; letter-spacing: -0.01em; color: #fff; text-shadow: 0 2px 2px rgba(0,0,0,.6), 0 0 14px rgba(0,0,0,.45); -webkit-text-stroke: 0px; }
+.page { animation: page-on var(--len) step-end both; animation-fill-mode: none; }
+@keyframes page-on { from { opacity: 1; } to { opacity: 1; } }
+.page .inner { display: inline-block; animation: page-pop .22s var(--spring) both; animation-fill-mode: none; }
+@keyframes page-pop { from { transform: scale(.94); opacity: .6; } to { transform: scale(1); opacity: 1; } }
+.w { display: inline-block; padding: 0 .12em; border-radius: .22em; margin: 0 .02em; }
+.w.on { animation: w-on var(--wlen) step-end both; animation-fill-mode: none; }
+/* pill: the spoken word sits in an accent pill. highlight: the spoken word turns accent. clean: no per-word change. */
+@keyframes w-on { from { background: var(--accent); color: #fff; transform: scale(1.06); text-shadow: none; } to { background: var(--accent); color: #fff; transform: scale(1.06); text-shadow: none; } }
+.style-highlight .w.on { animation-name: w-color; }
+@keyframes w-color { from { color: var(--accent); transform: scale(1.06); } to { color: var(--accent); transform: scale(1.06); } }
+.style-clean .w.on { animation: none; }
+.w.key { color: var(--accent); }
+.style-pill .w.key { color: #fff; }
+.uc { text-transform: uppercase; }
+</style></head><body><div class="stage"><div class="cap style-{{style}} {{uc}}">
+{{pages_html}}
+</div></div><script>{{harness}}</script></body></html>

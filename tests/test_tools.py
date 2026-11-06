@@ -313,6 +313,9 @@ broll:
   - {src: raw/photo.heic, at: 5.6, duration: 0.8, pip: {w: 0.6, x: 0.5, y: 0.4}}
 callouts:
   - {text: "$4,800 job (example)", at: 3.0, duration: 1.0, accent: true}
+plates:
+  - {type: compare, title: "Same work.", left: {label: You, value: 9}, right: {label: Them, value: 140}, note: "(example)", at: 4.2, duration: 1.2}
+  - {type: stat, value: 140, suffix: " reviews", label: "(example)", at: 6.3, duration: 0.9}
 look: {contrast: 1.03, saturation: 1.05, sharpen: true}
 lower_third: {text: "Bruce, Auburn AL", at: 0.5, duration: 1.5}
 music: {src: audio/music.mp3, gain_db: -16, duck: true}
@@ -377,12 +380,16 @@ def test_render_proxy_and_final(footage):
     assert not (g > 90 and g > 2 * r and g > 2 * b), (r, g, b)
     sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
     assert [c["src"] for c in sidecar["clips"]][-1] == "end_card"
-    assert sidecar["broll"][0]["at"] == 1.0 and sidecar["graphics"][0]["type"] == "hook_text"
+    assert sidecar["broll"][0]["at"] == 1.0 and sidecar["graphics"][0]["type"] in ("hook_text", "hook")
     assert len(sidecar["clips"]) == 6  # the tightened clip became two segments
-    assert [g["type"] for g in sidecar["graphics"]] == ["hook_text", "callout", "lower_third"]
+    assert [g["type"] for g in sidecar["graphics"]] == ["hook", "lower_third", "label", "compare", "pip", "stat"]
+    assert all(g["engine"] == "html" for g in sidecar["graphics"])
+    assert sidecar["captions"]["engine"] == "html" and sidecar["captions"]["style"] == "pill"
     assert sidecar["broll"][1]["pip"] is True
-    r, g, b = mean_rgb(final, 6.0, "crop=iw*0.4:ih*0.14:iw*0.3:ih*0.33")   # inside the pip of the red HEIC photo
+    r, g, b = mean_rgb(final, 6.0, "crop=iw*0.3:ih*0.1:iw*0.35:ih*0.37")   # inside the pip plate of the red HEIC photo
     assert r > 120 and r > 2 * g and r > 2 * b, (r, g, b)
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
+    assert s["flash frames (10 fps scan)"] == "PASS" and s["captions inside safe zone"] == "PASS"
     s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
     assert not [k for k, v in s.items() if v == "FAIL"], s
     feed = render.render(edl, "4:5", None, proxy=True, keep_tmp=False, out_dir=None)
@@ -514,7 +521,7 @@ def test_qa_sidecar_checks_and_review_page(footage):
     r = qa.qa_one(final, footage / "qa", -14, -1.0, script)
     s = statuses(r)
     assert s["headline on frame 1"] == "PASS" and s["end card with CTA"] == "PASS"
-    assert s["captions above bottom safe zone"] == "PASS" and s["caption width inside safe sides"] == "PASS"
+    assert s["captions inside safe zone"] == "PASS" and s["caption pages readable"] == "PASS"
     assert s["captions match script"] == "WARN"          # one of two lines is not in the captions
     assert s["face in hook (first 1.5s)"] == "WARN"      # synthetic footage has no face
     page = review.build(footage)
@@ -585,4 +592,25 @@ def test_render_all_ratios_reuses_words(footage, monkeypatch):
     v = common.video_stream(common.probe(feed))
     assert (int(v["width"]), int(v["height"])) == (1080, 1350)
     sc = json.loads((footage / "exports" / "TEST_offer_angle_question_10s_4x5_v1.render.json").read_text())
-    assert sc["ratio"] == "4:5" and sc["captions"]["style"] == "chunk"
+    assert sc["ratio"] == "4:5" and sc["captions"]["style"] == "pill"
+
+
+import plates  # noqa: E402
+
+
+def test_plates_render_alpha_and_storyboard(footage):
+    cfg = common.load_config()
+    r = plates.Renderer(540, 960)
+    try:
+        for spec in plates.demo_specs():
+            spec = {**spec, "duration": 0.5}
+            mov = footage / "work" / f"plate_{spec['type']}.mov"
+            r.render_mov(plates.build_html(spec, 540, 960, cfg), 0.5, 10, mov)
+            v = common.video_stream(common.probe(mov))
+            assert v["codec_name"] == "prores" and v["pix_fmt"].startswith("yuva"), spec["type"]
+    finally:
+        r.close()
+    edl = footage / "work" / "edl" / "TEST_offer_angle_question_10s_9x16_v1.yaml"
+    sheet = render.storyboard(edl, None)
+    from PIL import Image
+    assert sheet.exists() and Image.open(sheet).size[0] > 1000

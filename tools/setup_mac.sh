@@ -17,6 +17,9 @@ PY="$(brew --prefix python@3.12)/bin/python3.12"
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 
+# Headless Chromium for the motion plates (captions, callouts, cards, end card).
+.venv/bin/playwright install chromium
+
 # Optional: auto-editor (first-pass silence removal) is a separate CLI.
 brew install auto-editor || echo "auto-editor not installed (optional)"
 

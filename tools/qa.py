@@ -239,9 +239,44 @@ def caption_geometry(ass_path: Path, w: int, h: int, ratio: str, sidecar: dict) 
     return res
 
 
+def caption_pages_checks(pages_json: Path, h: int, sidecar: dict) -> list[dict]:
+    """Browser-rendered captions live inside a safe-zone container by construction; check pacing and overlap."""
+    pages = json.loads(pages_json.read_text())
+    if not pages:
+        return [check("caption pages", "WARN", "no caption pages")]
+    res = [check("captions inside safe zone", "PASS", f"{len(pages)} pages in the caption band (container bounded by the safe zone)")]
+    fast = [p for p in pages if (p["end"] - p["start"]) < 0.35 and len(p["text"].split()) >= 3]
+    res.append(check("caption pages readable", "PASS" if not fast else "WARN",
+                     "ok" if not fast else f"{len(fast)} pages of 3+ words shown under 0.35 s"))
+    long_words = [p for p in pages if len(p["text"]) > 34]
+    res.append(check("caption pages max 2 lines", "PASS" if not long_words else "WARN",
+                     "ok" if not long_words else f"{len(long_words)} pages over 34 characters may wrap to 3 lines"))
+    lt = next((g for g in sidecar.get("graphics", []) if g["type"] == "lower_third"), None)
+    if lt:
+        # The browser lower third sits 17% of the frame above the bottom safe zone; two caption lines reach about 13%.
+        clash = [p for p in pages if p["start"] < lt["at"] + lt["duration"] and p["end"] > lt["at"] and len(p["text"]) > 34]
+        res.append(check("lower third clear of captions", "PASS" if not clash else "WARN",
+                         "ok" if not clash else f"{len(clash)} three-line caption pages while the lower third is up"))
+    return res
+
+
+def script_check_pages(pages_json: Path, script_path: Path) -> list[dict]:
+    import selects  # noqa: WPS433
+
+    lines = selects.script_lines(script_path)
+    spoken = " ".join(p["text"] for p in json.loads(pages_json.read_text()))
+    toks = [selects.norm(t) for t in spoken.split() if selects.norm(t)]
+    words = [{"word": t, "start": i, "end": i} for i, t in enumerate(toks)]
+    missing = [ln for ln in lines if not (b := selects.best_spans(ln, words, top=1)) or b[0]["score"] < 0.6]
+    if not lines:
+        return [check("captions match script", "WARN", "no script lines parsed")]
+    status = "PASS" if not missing else ("WARN" if len(missing) <= len(lines) / 2 else "FAIL")
+    return [check("captions match script", status, "all lines heard" if not missing else "not heard: " + " | ".join(m[:50] for m in missing[:5]))]
+
+
 def sidecar_checks(sidecar: dict, duration: float) -> list[dict]:
     res = []
-    hook = next((g for g in sidecar.get("graphics", []) if g["type"] == "hook_text" and g["at"] == 0.0), None)
+    hook = next((g for g in sidecar.get("graphics", []) if g["type"] in ("hook_text", "hook") and g["at"] == 0.0), None)
     res.append(check("headline on frame 1", "PASS" if hook else "WARN",
                      f'"{hook["text"]}" for {hook["duration"]}s' if hook else "no hook_text in the EDL; the text hook must be on screen from frame 1"))
     res.append(check("duration for all placements", "PASS" if duration <= MAX_SECONDS_ALL_PLACEMENTS else "WARN",
@@ -307,6 +342,68 @@ def script_check(ass_path: Path, script_path: Path) -> list[dict]:
     return [check("captions match script", status, "all lines heard" if not missing else "not heard: " + " | ".join(m[:50] for m in missing[:5]))]
 
 
+def frame_scan(path: Path, fps: int = 10) -> list[dict]:
+    """Watch the ad at 10 frames per second like an editor would: flag flash frames (one frame that differs
+    sharply from both neighbours while the neighbours match each other) and frozen stretches."""
+    import numpy as np
+
+    sw, sh = 96, 96
+    raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-i", str(path), "-vf", f"fps={fps},scale={sw}:{sh},format=gray",
+                          "-f", "rawvideo", "-"], capture_output=True).stdout
+    n = len(raw) // (sw * sh)
+    if n < 4:
+        return []
+    frames = np.frombuffer(raw[: n * sw * sh], np.uint8).reshape(n, sh, sw).astype(np.int16)
+    d = np.abs(np.diff(frames, axis=0)).mean(axis=(1, 2)) / 255.0   # d[i] = diff between frame i and i+1
+    flashes, frozen = [], []
+    for i in range(1, n - 1):
+        prev_next = np.abs(frames[i - 1] - frames[i + 1]).mean() / 255.0
+        if d[i - 1] > 0.18 and d[i] > 0.18 and prev_next < 0.06:
+            flashes.append(round(i / fps, 1))
+    run = 0
+    for i, v in enumerate(d):
+        run = run + 1 if v < 0.002 else 0
+        if run == fps * 3:   # 3 s with no visible change (end card excluded by the caller via sidecar)
+            frozen.append(round((i - run + 1) / fps, 1))
+    res = [check("flash frames (10 fps scan)", "PASS" if not flashes else "FAIL",
+                 "none" if not flashes else "at " + ", ".join(f"{t}s" for t in flashes[:8]))]
+    res.append(check("no frozen stretch over 3s", "PASS" if not frozen else "WARN",
+                     "none" if not frozen else "from " + ", ".join(f"{t}s" for t in frozen[:5]) + " (a still or a static graphic held too long?)"))
+    return res
+
+
+def plate_over_face(path: Path, sidecar: dict) -> list[dict]:
+    """A graphic that sits on the speaker's face is the mistake editors catch first."""
+    plates = [g for g in sidecar.get("graphics", []) if g.get("region") in ("center",)]
+    if not plates:
+        return []
+    try:
+        import render  # noqa: WPS433
+        import numpy as np
+    except ImportError:
+        return []
+    detect = render.face_detector()
+    if detect is None:
+        return []
+    hits = []
+    for g in plates:
+        t = g["at"] + min(0.5, g["duration"] / 2)
+        raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-ss", f"{t:.2f}", "-i", str(path), "-frames:v", "1",
+                              "-vf", "scale=480:-2", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], capture_output=True).stdout
+        if not raw:
+            continue
+        hh = len(raw) // (480 * 3)
+        img = np.frombuffer(raw[: hh * 480 * 3], np.uint8).reshape(hh, 480, 3)
+        faces = detect(img)
+        if faces:
+            x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+            cy = (y + h / 2) / hh
+            if 0.30 < cy < 0.55:   # the center band where center plates sit
+                hits.append(f"{g.get('type')} at {g['at']}s")
+    return [check("graphics clear of the face", "PASS" if not hits else "WARN",
+                  "none overlap" if not hits else "possible overlap: " + ", ".join(hits[:5]))]
+
+
 def first_frame_signature(path: Path) -> bytes:
     return subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-i", str(path), "-frames:v", "1",
                            "-vf", "scale=32:32,format=gray", "-f", "rawvideo", "-"],
@@ -340,17 +437,26 @@ def qa_one(path: Path, qa_dir: Path, target: float, tp_max: float, script: Path 
     sidecar = load_sidecar(path)
     if sidecar:
         results += sidecar_checks(sidecar, meta["duration"])
-        ass = Path((sidecar.get("captions") or {}).get("ass", ""))
-        if ass.exists() and meta.get("ratio"):
+        caps = sidecar.get("captions") or {}
+        ass = Path(caps["ass"]) if caps.get("ass") else None
+        pages_json = Path(caps["pages"]) if caps.get("pages") else None
+        if ass and ass.is_file() and meta.get("ratio"):
             results += caption_geometry(ass, meta["width"], meta["height"], meta["ratio"], sidecar)
             if script:
                 results += script_check(ass, script)
+        elif pages_json and pages_json.is_file():
+            results += caption_pages_checks(pages_json, meta["height"], sidecar)
+            if script:
+                results += script_check_pages(pages_json, script)
         else:
             results.append(check("captions burned", "WARN", "no caption file recorded; render with --captions"))
     else:
         results.append(check("render sidecar", "WARN", "no .render.json next to the file; geometry and hook checks skipped"))
     if "width" in meta:
         results += face_checks(path, sidecar, meta["duration"])
+        results += frame_scan(path)
+        if sidecar:
+            results += plate_over_face(path, sidecar)
         evidence(path, out, meta)
     results += [check(m, "MANUAL", "look at the images in this folder") for m in MANUAL_CHECKS]
     report = {"file": str(path), **meta, "results": results}

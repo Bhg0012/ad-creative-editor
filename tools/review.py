@@ -86,9 +86,12 @@ def build(batch: Path) -> Path:
                 for g in tl.get("graphics", []):
                     parts.append(f"<tr><td>{g['at']:.2f}</td><td>{g['duration']:.2f}</td><td>{g['type']}: {html.escape(str(g.get('text', '')))}</td></tr>")
                 parts.append("</table></details>")
-                ass = Path((tl.get("captions") or {}).get("ass", ""))
-                if ass.exists():
-                    parts.append("<details><summary>Captions</summary><pre>" + html.escape("\n".join(ass_text(ass))) + "</pre></details>")
+                caps = tl.get("captions") or {}
+                if caps.get("ass") and Path(caps["ass"]).is_file():
+                    parts.append("<details><summary>Captions</summary><pre>" + html.escape("\n".join(ass_text(Path(caps["ass"])))) + "</pre></details>")
+                elif caps.get("pages") and Path(caps["pages"]).is_file():
+                    pages = json.loads(Path(caps["pages"]).read_text())
+                    parts.append("<details><summary>Captions</summary><pre>" + html.escape("\n".join(f"{p['start']:6.2f}  {p['text']}" for p in pages)) + "</pre></details>")
             rows = qa_rows(batch, f.stem)
             if rows:
                 fails = sum(r["status"] == "FAIL" for r in rows)

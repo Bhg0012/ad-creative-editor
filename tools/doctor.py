@@ -27,6 +27,7 @@ PY_PACKAGES = [
     ("numpy", "numpy", True),
     ("PIL", "pillow", True),
     ("cv2", "opencv-python", True),
+    ("playwright", "playwright", True),
     ("mlx_whisper", "mlx-whisper", False),
     ("whisperx", "whisperx", False),
     ("faster_whisper", "faster-whisper", False),
@@ -68,6 +69,19 @@ def check_tools() -> list[str]:
     print(f"  caption font {font_name!r}: {'ok ' + font if exact else 'NOT in brand/fonts' + (f' (fallback {font})' if font else '')}")
     if not exact:
         problems.append(f"put the licensed {font_name} .ttf/.otf in brand/fonts/ (captions and headlines fall back to another font until then)")
+    try:
+        import plates  # noqa: WPS433
+        chrome = plates.chromium_path()
+        if chrome:
+            print(f"  chromium for motion plates: ok {chrome}")
+        else:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                pw.chromium.launch(args=["--no-sandbox"]).close()
+            print("  chromium for motion plates: ok (playwright default)")
+    except Exception as e:  # noqa: BLE001
+        print(f"  chromium for motion plates: missing ({str(e).splitlines()[0][:60]})")
+        problems.append("headless Chromium missing -> .venv/bin/playwright install chromium")
     model = ROOT / "tools" / "models" / "face_detection_yunet_2023mar.onnx"
     print(f"  face detector model: {'ok' if model.exists() else 'missing (render focus:auto falls back to center)'}")
     node = shutil.which("node")

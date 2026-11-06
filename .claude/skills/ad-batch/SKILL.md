@@ -5,7 +5,7 @@ description: Start or resume a batch of Meta (Facebook + Instagram) video and st
 
 # Ad batch pipeline
 
-Work one stage at a time. At every **GATE**: stop, show the output, update `BATCH.md`, and wait for Bruce's "yes". Apply every note he gives and log it in `LEARNINGS.md` immediately.
+Work one stage at a time. At every **GATE**: stop, show the output, update `BATCH.md`, and wait for Bruce's "yes". Apply every note he gives, log it in `LEARNINGS.md` immediately, and then find the instruction that should have prevented it (in this skill, its references, `tools/plates/theme.css`, or `config.yaml`) and rewrite that instruction so the next ad cannot repeat the mistake.
 
 Reference files (read when the stage needs them):
 - `reference/angles-and-hooks.md`: angle families, hook types, hook scoring rubric
@@ -23,6 +23,7 @@ Reference files (read when the stage needs them):
 3. Resuming? Find the batch in `batches/`, read its `BATCH.md`, continue at the first unfinished gate.
 4. New batch? Confirm market (one per batch, never blend Auburn-Opelika and Huntsville) and offer, then run `.venv/bin/python tools/new_batch.py --market <HSV|AUB> --offer <slug>`.
 5. Ask every `TBD` needed for Stages 1-3 in ONE batched list. Never guess offer terms, price, guarantees, results, or scarcity.
+6. **Design references (once, then whenever Bruce adds one).** If `brand/references/` holds screenshots or clips of ads whose look Bruce wants, view them and write `brand/DESIGN.md`: what the text does on entry and exit, caption style, card shapes, color use, pacing, sound. Apply it by editing `tools/plates/theme.css` (colors, radius, shadow, easing) and `reference/visual-style.md`; never by one-off styling inside an EDL. No references yet: the house style stands.
 
 All batch paths below are relative to `batches/<id>/`.
 
@@ -100,10 +101,11 @@ Size the batch to the budget: each live ad needs enough spend to be judged (see 
 2. **Transcribe:** `.venv/bin/python tools/transcribe.py raw/<files> --out work/transcripts` (word-level JSON + SRT + TXT; picks mlx-whisper, WhisperX, or faster-whisper, whichever is installed). Check low-confidence words by ear.
 3. **Look at the footage:** view every contact sheet in `work/sheets/` (1 frame per 2 s with timecodes). Tag each clip in `work/selects.md`: framing, setting, energy, problems (blur, bad light, wind noise), and which B-roll shows what.
 4. **Selects:** `.venv/bin/python tools/selects.py --script brief/08_scripts.md --transcripts work/transcripts --out work/selects.md --edl work/edl/<adname>.yaml --name <adname>` finds the best take per script line (top 3 candidates with scores) and writes a draft EDL. Lines reported NOT FOUND need filming or rewriting. Pick takes on correct words, best delivery, no stumbles; energy and clarity over perfection.
-5. **EDL per ad (`work/edl/<adname>.yaml`):** the single source of truth for the cut (see `tools/render.py --example`): A-roll clips with in/out, `zoom` or `push`, `tighten` to shorten pauses (gaps, never words), B-roll windows, hook text, lower third, music, SFX, end card. Every later revision edits this file, never the MP4. Remove dead air, breaths between sentences, ums, restarts. Never speed up speech.
-6. **Rough cut proxies:** `.venv/bin/python tools/render.py work/edl/<adname>.yaml --proxy` (540 px, timecode burned, no music or graphics) into `work/proxies/`.
+5. **Beat map (`work/beatmap.md`), before any graphic is built.** One row per idea in the script: idea | the words spoken | what is on screen (A-roll, B-roll, which plate type) | at | duration | sound. Rules: one graphic per idea, not per sentence; it stays up long enough to read (words x 0.3 s + 0.8 s, never under 1.5 s); nothing covers the face in the hook or the CTA; the number or the offer gets the strongest plate (stat, compare), the mechanism gets B-roll or a pip, the list gets a card. Changing the plan is free; changing a finished graphic costs a render.
+6. **EDL per ad (`work/edl/<adname>.yaml`):** the single source of truth for the cut (see `tools/render.py --example`): A-roll clips with in/out, `zoom` or `push`, `tighten` to shorten pauses (gaps, never words), B-roll windows, hook text, lower third, music, SFX, end card. Every later revision edits this file, never the MP4. Remove dead air, breaths between sentences, ums, restarts. Never speed up speech.
+7. **Storyboard, then rough cut:** `.venv/bin/python tools/render.py work/edl/<adname>.yaml --storyboard` tiles every graphic over the frame it sits on (no render, seconds) into `work/storyboard_<adname>.png`; look at it and fix the EDL before rendering anything. Then `--proxy` (540 px, timecode burned, no music or graphics) into `work/proxies/`.
 
-**GATE 5:** proxies plus EDLs. Apply every note by editing the EDL and re-rendering the proxy; log each note in `LEARNINGS.md`.
+**GATE 5:** storyboard, proxies, and EDLs. Apply every note by editing the EDL and re-rendering the proxy; log each note in `LEARNINGS.md`.
 
 ## Stage 6: full edit
 
@@ -114,13 +116,14 @@ Follow `reference/visual-style.md` for the look and `reference/scripts-and-editi
 3. `.venv/bin/python tools/render.py work/edl/<adname>.yaml --captions work/transcripts/<adname>_master.words.json` burns captions in the style from `config.yaml` (`captions.style`, or `caption_style` in the EDL for one ad) and writes `exports/<adname>.mp4` plus `exports/<adname>.render.json` (the timeline sidecar for QA and DECISIONS). `--all-ratios --captions auto` renders every ratio in `batch_defaults.aspect_ratios` in one go, transcribing once.
 
 Key points:
+- Graphics are motion plates (`reference/scripts-and-editing.md`, "Motion plates"): the hook card, callouts, lower third, stat, compare, card, pip and the end card are rendered in a browser with real easing from one design system, and every entrance gets a sound effect. Flat text is only the fallback when Chromium is missing.
 - Pattern interrupt every 2-4s in the first 10s (alternate `zoom: 1.0` and `zoom: 1.08-1.12`, B-roll, text); B-roll shows what the VO says; face on screen in hook and CTA.
 - Captions are generated from a transcript of the final master, never retyped. Default style `chunk` for this ICP; make one variant per batch in `hormozi` or `highlight` style and let the data decide.
 - Every text element inside the safe zone for its ratio (render.py places them there; QA still checks).
 - Mix to the loudness target in `config.yaml`, verified by `tools/qa.py`.
 - Must make complete sense with sound off, and with eyes closed.
 
-**Self-review loop (every render, before Bruce sees it):** run `reference/edit-checklist.md`: render, then look at the QA evidence (first frame, safe-zone frames, contact sheet, mobile frames) and the `.render.json`, fix the EDL, re-render. Up to three passes. Typical fixes: hook text wraps to three lines (shorten it), caption page clashes with the lower third (move `lower_third.at`), B-roll covers the speaker during the CTA (shorten `duration`), zoom alternation missing (set `zoom` on every other clip), music audible over speech (lower `gain_db`).
+**Self-review loop (every render, before Bruce sees it):** run `reference/edit-checklist.md`: render, then watch the ad the way an editor does, 10 frames per second (`tools/qa.py` scans for flash frames and frozen stretches; you check the contact sheet for the rest): an animation that plays twice, a graphic that flashes for a split second, text that lands too late to read, a graphic sitting on the face, a word said twice in a row, lips drifting from the voice. Then look at the QA evidence (first frame, safe-zone frames, contact sheet, mobile frames) and the `.render.json`, fix the EDL, re-render. Up to three passes. Typical fixes: hook text wraps to three lines (shorten it), caption page clashes with the lower third (move `lower_third.at`), B-roll covers the speaker during the CTA (shorten `duration`), zoom alternation missing (set `zoom` on every other clip), music audible over speech (lower `gain_db`).
 
 **Single-variable versions (`tools/variants.py`):** when `batch_defaults.variants.enabled` is yes, write `work/edl/<hero>.variants.yaml` next to the approved hero EDL (format in the tool's docstring): the hero's swap-able clips carry `slot: hook`, `slot: offer`, `slot: cta`, and each dimension value patches `hook_text`, the slot clip, callouts, or the end card. Run `.venv/bin/python tools/variants.py <file>` to write the EDLs and `work/edl/variants/MATRIX.md`, proxy-check two of them, then `--render --captions auto` for all. Log every variant in `DECISIONS.md` as `iteration` of the hero. Variants are not concept diversity: they still count as one concept for Meta's similarity grouping, so the batch also needs its genuinely different concepts below.
 

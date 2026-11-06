@@ -80,8 +80,12 @@ clips:                        # A-roll in timeline order; in/out are seconds in 
 broll:                        # picture-only overlays on the timeline; the voice continues
   - {src: raw/phone_text.mov, at: 6.0, duration: 2.5, src_in: 0.0, label: "A text goes out"}
   - {src: raw/review_screenshot.heic, at: 14.0, duration: 2.0, pip: {w: 0.72, x: 0.5, y: 0.40}}  # picture-in-picture
-callouts:                     # short on-screen text mid-video: a number, a re-hook, a label
+callouts:                     # short on-screen text mid-video: a number, a re-hook, a label (rendered as animated cards)
   - {text: "$4,800 roof job (example)", at: 9.0, duration: 2.0, position: center, accent: true}
+plates:                       # richer motion graphics (tools/plates.py): stat, compare, card, label, pip
+  - {type: compare, title: "Same work. Different phone.", left: {label: You, value: 9}, right: {label: "The other guy", value: 140}, note: "Google reviews (example)", at: 4.0, duration: 3.0}
+  - {type: stat, value: 140, suffix: " reviews", label: "your competitor (example)", at: 12.0, duration: 2.5}
+  - {type: card, title: "You get", items: ["Review requests sent for you", "Replies written for you", "Monthly report by text"], at: 18.0, duration: 3.5}
 lower_third: {text: "Bruce, Auburn AL", at: 1.0, duration: 3.0}
 look: {contrast: 1.04, saturation: 1.08, sharpen: true}   # optional light grade on A-roll only
 music: {src: audio/music/track.mp3, gain_db: -18, duck: true, fade_out: 1.0}
@@ -416,6 +420,24 @@ def render_end_card(card: dict, out: Path, out_w: int, out_h: int, fps: int, enc
     run_ffmpeg(args)
 
 
+def render_end_card_html(card: dict, out: Path, out_w: int, out_h: int, fps: int, enc: list[str], cfg: dict, tmp: Path) -> None:
+    """Animated end card (logo pop, headline, pulsing CTA button) rendered as a plate on the brand color."""
+    import plates as pl  # noqa: WPS433
+
+    secs = float(card.get("seconds") or DEFAULTS["end_card_seconds"])
+    spec = {"type": "endcard", "headline": card.get("headline", ""), "text": card.get("text") or "Tap Learn More",
+            "subtext": card.get("subtext", ""), "logo": card.get("logo", True), "duration": secs}
+    mov = tmp / "end_card_plate.mov"
+    r = pl.Renderer(out_w, out_h)
+    try:
+        r.render_mov(pl.build_html(spec, out_w, out_h, cfg), secs, fps, mov)
+    finally:
+        r.close()
+    run_ffmpeg(["-i", str(mov), "-f", "lavfi", "-t", f"{secs:.3f}", "-i", "anullsrc=r=48000:cl=stereo",
+                "-map", "0:v:0", "-map", "1:a:0", "-vf", "format=yuv420p", *enc, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+                "-ac", "2", "-shortest", "-video_track_timescale", "90000", str(out)])
+
+
 def concat(segments: list[Path], out: Path, tmp: Path) -> None:
     lst = tmp / "concat.txt"
     lst.write_text("".join(f"file '{p.as_posix()}'\n" for p in segments))
@@ -424,6 +446,51 @@ def concat(segments: list[Path], out: Path, tmp: Path) -> None:
 
 def duration_of(path: Path) -> float:
     return float(probe(path)["format"]["duration"])
+
+
+# ---------- motion plates (browser-rendered graphics) ----------
+
+def plates_available(cfg: dict) -> bool:
+    if str((cfg.get("graphics") or {}).get("engine") or "html") != "html":
+        return False
+    try:
+        import playwright  # noqa: F401
+        import plates  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def plate_specs(edl: dict, cfg: dict) -> list[dict]:
+    """Every graphic as a plate spec with `at` and `duration`, in render order (hook first, end card last)."""
+    specs = []
+    if edl.get("hook_text"):
+        specs.append({"type": "hook", "text": str(edl["hook_text"]), "at": 0.0,
+                      "duration": float(edl.get("hook_text_seconds") or DEFAULTS["hook_text_seconds"]),
+                      "variant": str(edl.get("hook_variant") or "dark")})
+    lt = edl.get("lower_third")
+    if lt and lt.get("text"):
+        text, sub = str(lt["text"]), str(lt.get("sub") or "")
+        if not sub and "," in text:
+            text, sub = (x.strip() for x in text.split(",", 1))
+        specs.append({"type": "lower_third", "text": text, "sub": sub, "at": float(lt.get("at") or 1.0), "duration": float(lt.get("duration") or 3.0)})
+    for co in edl.get("callouts") or []:
+        specs.append({"type": "label", "text": str(co["text"]), "at": float(co["at"]), "duration": float(co.get("duration") or 2.0),
+                      "position": str(co.get("position") or "center"), "variant": "accent" if co.get("accent") else str(co.get("variant") or "dark"),
+                      "emoji": co.get("emoji", ""), "sfx": co.get("sfx", "pop")})
+    for b in edl.get("broll") or []:
+        if b.get("pip") and b.get("still") and b.get("_html_pip"):
+            pip = b["pip"]
+            specs.append({"type": "pip", "src": str(b["path"]), "at": float(b["at"]), "duration": float(b["duration"]),
+                          "w": pip.get("w"), "y": pip.get("y"), "device": pip.get("device"), "zoom": pip.get("zoom"), "caption": b.get("label")})
+    for pl in edl.get("plates") or []:
+        sp = dict(pl)
+        sp.setdefault("duration", 2.5)
+        specs.append(sp)
+    for sp in specs:
+        if "at" not in sp:
+            raise SystemExit(f"plate {sp.get('type')} needs `at`")
+    return sorted(specs, key=lambda x: (float(x["at"]), x["type"] != "hook"))
 
 
 # ---------- composite ----------
@@ -473,8 +540,13 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
     idx = 1
     cur = "[0:v]"
     # B-roll overlays (picture only)
+    use_html = (not proxy) and plates_available(cfg)
     for b in edl.get("broll") or []:
         at, dur = float(b["at"]), float(b["duration"])
+        if use_html and b.get("pip") and b.get("still"):
+            b["_html_pip"] = True   # rendered as a motion plate below (rounded frame, shadow, slow zoom)
+            timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label"), "pip": True, "engine": "html"})
+            continue
         seg = tmp / f"broll_{idx}.mp4"
         clip = {"path": b["path"], "still": b["still"], "vstream": b["vstream"], "astream": None,
                 "zoom": b.get("zoom") or 1.0, "push": b.get("push")}
@@ -510,7 +582,29 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
             vchain.append(f"{cur}{drawtext_block(font, lf, size, 'white', str(y), at, at + dur, 'black@0.55')}[l{idx}]")
             cur = f"[l{idx}]"
         idx += 1
-    if not proxy:
+    html_engine = (not proxy) and plates_available(cfg)
+    if html_engine:
+        # Browser-rendered motion plates: hook, callouts, lower third, cards, stats, pip images. Flat drawtext is the fallback.
+        specs = plate_specs(edl, cfg)
+        if specs:
+            import plates as pl  # noqa: WPS433
+
+            r = pl.Renderer(out_w, out_h)
+            try:
+                for n, sp in enumerate(specs):
+                    mov = tmp / f"plate_{n:02d}_{sp['type']}.mov"
+                    r.render_mov(pl.build_html(sp, out_w, out_h, cfg), float(sp["duration"]), fps, mov)
+                    at, dur = float(sp["at"]), float(sp["duration"])
+                    inputs += ["-i", str(mov)]
+                    vchain.append(f"[{idx}:v]format=rgba,setpts=PTS-STARTPTS+{at:.3f}/TB[p{n}]")
+                    vchain.append(f"{cur}[p{n}]overlay=format=auto:eof_action=pass:enable='between(t,{at:.3f},{at + dur:.3f})'[pv{n}]")
+                    cur = f"[pv{n}]"
+                    idx += 1
+                    timeline["graphics"].append({"type": sp["type"], "text": sp.get("text") or sp.get("title") or sp.get("headline") or "",
+                                                 "at": at, "duration": dur, "region": pl.region_of(sp), "engine": "html"})
+            finally:
+                r.close()
+    if not proxy and not html_engine:
         # Headline hook text from frame 1, inside the top safe zone
         if edl.get("hook_text"):
             hf = tmp / "hook.txt"
@@ -579,7 +673,21 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
     else:
         achain.append(f"[0:a]{','.join(voice)}[vo]")
         mix_inputs = ["[vo]"]
-    for n, s in enumerate(edl.get("sfx") or [] if not proxy else []):
+    sfx_list = list(edl.get("sfx") or []) if not proxy else []
+    gcfg = cfg.get("graphics") or {}
+    if html_engine and gcfg.get("auto_sfx", True):
+        import plates as pl  # noqa: WPS433
+        import sfx as sfxmod  # noqa: WPS433
+
+        defaults = sfxmod.ensure_defaults(tmp / "sfx")
+        gain = float(gcfg.get("sfx_gain_db") if gcfg.get("sfx_gain_db") is not None else -14.0)
+        for sp in plate_specs(edl, cfg):
+            name = sp.get("sfx", pl.ENTRANCE_SFX.get(sp["type"]))
+            if not name or float(sp["at"]) <= 0.0:
+                continue
+            custom = ROOT / "audio" / "sfx" / f"{name}.wav"
+            sfx_list.append({"path": custom if custom.exists() else defaults.get(name, defaults["pop"]), "at": float(sp["at"]), "gain_db": gain, "src": name})
+    for n, s in enumerate(sfx_list):
         inputs += ["-i", str(s["path"])]
         at_ms = int(round(float(s["at"]) * 1000))
         gain = float(s.get("gain_db") if s.get("gain_db") is not None else -10.0)
@@ -639,6 +747,39 @@ def build_captions(words_json: Path, out_w: int, out_h: int, ass_out: Path, cfg:
                         uppercase=bool(c.get("uppercase")), keywords=keywords,
                         style=str(edl.get("caption_style") or c.get("style") or "chunk"))
     ass_out.write_text(ass)
+
+
+ASS_STYLES = {"chunk", "highlight", "karaoke", "reveal", "hormozi"}
+HTML_STYLES = {"pill", "highlight", "clean"}
+
+
+def build_caption_plate(words_json: Path, out_w: int, out_h: int, total: float, fps: int, out: Path, cfg: dict, edl: dict) -> list[dict]:
+    """Word-timed captions as a transparent plate covering the whole ad. Returns the page list for QA."""
+    import captions as cap  # noqa: WPS433
+    import plates as pl  # noqa: WPS433
+
+    c = cfg.get("captions") or {}
+    words = cap.apply_fixes(json.loads(words_json.read_text()), c.get("fixes") or {})
+    style = str(edl.get("caption_style") or c.get("style") or "pill")
+    if style not in HTML_STYLES:
+        style = {"chunk": "clean", "karaoke": "pill", "reveal": "pill", "hormozi": "pill"}.get(style, "pill")
+    keywords = [k for k in (c.get("keywords") or [])] + [k for k in (edl.get("caption_keywords") or [])]
+    spec = {"type": "captions", "words": words, "style": style, "keywords": keywords,
+            "max_words": max(2, min(5, int(c.get("words_per_chunk_max") or 4))), "uppercase": bool(c.get("uppercase")),
+            "duration": total}
+    r = pl.Renderer(out_w, out_h)
+    try:
+        r.render_mov(pl.build_html(spec, out_w, out_h, cfg), total, fps, out)
+    finally:
+        r.close()
+    chunks = cap.chunk(words, spec["max_words"])
+    return [{"start": ch[0]["start"], "end": cap.page_end(chunks, n), "text": " ".join(w["word"] for w in ch)} for n, ch in enumerate(chunks)]
+
+
+def finalize_with_plate(comp: Path, out: Path, lf: str, plate: Path, enc: list[str], fps: int) -> None:
+    run_ffmpeg(["-i", str(comp), "-i", str(plate), "-filter_complex",
+                "[1:v]format=rgba[c];[0:v][c]overlay=format=auto:eof_action=pass,format=yuv420p[v]",
+                "-map", "[v]", "-map", "0:a:0", "-af", lf, *enc, "-r", str(fps), *AUD_ENC, "-movflags", "+faststart", str(out)])
 
 
 def transcribe_master(master: Path, out_dir: Path) -> Path | None:
@@ -741,7 +882,10 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         card = edl.get("end_card")
         if card and not proxy:
             seg = tmp / "end_card.mp4"
-            render_end_card({**card, "_ratio": ratio}, seg, out_w, out_h, fps, enc, cfg, font, tmp)
+            if plates_available(cfg):
+                render_end_card_html(card, seg, out_w, out_h, fps, enc, cfg, tmp)
+            else:
+                render_end_card({**card, "_ratio": ratio}, seg, out_w, out_h, fps, enc, cfg, font, tmp)
             timeline_clips.append({"src": "end_card", "at": round(t, 3), "duration": round(duration_of(seg), 3)})
             t += duration_of(seg)
             segments.append(seg)
@@ -783,14 +927,24 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
                       "\n      then re-run with --captions", batch_dir / "work" / "transcripts" / f"{master.stem}.words.json")
             return master
 
-        ass = cuts / f"{edl['name']}.ass"
-        build_captions(words, out_w, out_h, ass, cfg, edl)
         final = exports / f"{edl['name']}.mp4"
-        log = finalize(comp, final, lf, ass, ROOT / "brand" / "fonts", ENC_FINAL, fps)
-        if re.search(r"fontselect|Using default font|font.*not found", log, re.I):
-            print("WARNING: libass could not load the caption font; check brand/fonts and business.caption_font_name:\n" + log)
-        timeline["captions"] = {"words_json": str(words), "ass": str(ass),
-                                "style": str(edl.get("caption_style") or (cfg.get("captions") or {}).get("style") or "chunk")}
+        ccfg = cfg.get("captions") or {}
+        cap_engine = str(edl.get("caption_engine") or ccfg.get("engine") or "html")
+        if cap_engine == "html" and plates_available(cfg):
+            cap_mov = cuts / f"{edl['name']}_captions.mov"
+            pages = build_caption_plate(words, out_w, out_h, total, fps, cap_mov, cfg, edl)
+            (cuts / f"{edl['name']}.captions.json").write_text(json.dumps(pages, indent=1))
+            finalize_with_plate(comp, final, lf, cap_mov, ENC_FINAL, fps)
+            timeline["captions"] = {"words_json": str(words), "plate": str(cap_mov), "pages": str(cuts / f"{edl['name']}.captions.json"),
+                                    "engine": "html", "style": str(edl.get("caption_style") or ccfg.get("style") or "pill")}
+        else:
+            ass = cuts / f"{edl['name']}.ass"
+            build_captions(words, out_w, out_h, ass, cfg, edl)
+            log = finalize(comp, final, lf, ass, ROOT / "brand" / "fonts", ENC_FINAL, fps)
+            if re.search(r"fontselect|Using default font|font.*not found", log, re.I):
+                print("WARNING: libass could not load the caption font; check brand/fonts and business.caption_font_name:\n" + log)
+            timeline["captions"] = {"words_json": str(words), "ass": str(ass), "engine": "ass",
+                                    "style": str(edl.get("caption_style") or ccfg.get("style") or "chunk")}
         (exports / f"{edl['name']}.render.json").write_text(json.dumps(timeline, indent=1))
         print(f"Final: {final} ({total:.2f}s, {out_w}x{out_h}@{fps}); sidecar {exports / (edl['name'] + '.render.json')}")
         return final
@@ -800,6 +954,74 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
             tmp_ctx._finalizer.detach()  # noqa: SLF001
         else:
             tmp_ctx.cleanup()
+
+
+def storyboard(edl_path: Path, ratio: str | None) -> Path:
+    """The plan before the build: every graphic at 40% of its life over the clip it sits on, tiled with timecodes."""
+    import plates as pl  # noqa: WPS433
+    from PIL import Image, ImageDraw
+
+    cfg = load_config()
+    edl = load_edl(edl_path, ratio)
+    batch_dir = batch_dir_of(edl_path)
+    for c in edl["clips"] + (edl.get("broll") or []):
+        info = probe(c["path"])
+        c["vstream"], c["astream"] = video_stream(info), audio_stream(info)
+    fw, fh = display_size(edl["clips"][0]["vstream"])
+    cw, *_ = crop_box(fw, fh, edl["ratio"], (0.5, 0.5), 1.0)
+    out_w, out_h = pick_resolution(edl["ratio"], cw)
+    tl = timeline_of(edl_path, ratio)
+    for b in edl.get("broll") or []:
+        if b.get("pip") and b.get("still"):
+            b["_html_pip"] = True
+    specs = plate_specs(edl, cfg)
+    tmp = batch_dir / "work" / "storyboard_tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+
+    def frame_at(t: float) -> Image.Image:
+        seg = next((c for c in tl if c["at"] <= t < c["at"] + c["duration"] and c["src"] != "end_card"), None)
+        if seg is None:
+            return Image.new("RGB", (out_w, out_h), (59, 150, 246))
+        clip = next(c for c in edl["clips"] if c["src"] == seg["src"])
+        src_t = seg["src_in"] + (t - seg["at"])
+        png = tmp / "f.png"
+        sw, sh = display_size(clip["vstream"])
+        bw, bh, bx, by = crop_box(sw, sh, edl["ratio"], (0.5, 0.42), float(clip.get("zoom") or 1.0))
+        args = ["-loop", "1", "-t", "0.1", "-i", str(clip["path"])] if clip["still"] else ["-ss", f"{src_t:.3f}", "-i", str(clip["path"])]
+        run_ffmpeg([*args, "-frames:v", "1", "-vf", f"crop={bw}:{bh}:{bx}:{by},scale={out_w}:{out_h}", str(png)])
+        return Image.open(png).convert("RGB")
+
+    tiles = []
+    r = pl.Renderer(out_w, out_h)
+    try:
+        for sp in specs:
+            t = float(sp["at"]) + min(0.6, float(sp["duration"]) * 0.4)
+            base = frame_at(t)
+            still = tmp / "p.png"
+            r.render_still(pl.build_html(sp, out_w, out_h, cfg), min(0.6, float(sp["duration"]) * 0.4), still)
+            base.paste(Image.open(still).convert("RGBA"), (0, 0), Image.open(still).convert("RGBA"))
+            tiles.append((f"{t:.1f}s {sp['type']}", base))
+    finally:
+        r.close()
+    for seg in tl:
+        if seg["src"] != "end_card":
+            tiles.append((f"{seg['at']:.1f}s clip {Path(seg['src']).name}", frame_at(seg["at"] + 0.05)))
+    tiles.sort(key=lambda x: float(x[0].split("s")[0]))
+    tw = 360
+    th = round(out_h * tw / out_w)
+    cols = 4
+    rows = (len(tiles) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * (tw + 8) + 8, rows * (th + 30) + 8), (32, 34, 40))
+    d = ImageDraw.Draw(sheet)
+    for i, (label, im) in enumerate(tiles):
+        x, y = 8 + (i % cols) * (tw + 8), 8 + (i // cols) * (th + 30)
+        sheet.paste(im.resize((tw, th)), (x, y + 22))
+        d.text((x, y + 4), label, fill=(230, 230, 230))
+    out = batch_dir / "work" / f"storyboard_{edl['name']}.png"
+    sheet.save(out)
+    import shutil as _sh
+    _sh.rmtree(tmp, ignore_errors=True)
+    return out
 
 
 def main() -> int:
@@ -813,6 +1035,8 @@ def main() -> int:
     ap.add_argument("--proxy", action="store_true", help="fast 540 px rough cut with timecode, no music or graphics")
     ap.add_argument("--out-dir", help="override the output folder")
     ap.add_argument("--keep-tmp", action="store_true", help="keep intermediate files for debugging")
+    ap.add_argument("--storyboard", action="store_true",
+                    help="no render: one still per graphic plus the first frame of every clip, tiled into work/storyboard_<name>.png")
     ap.add_argument("--example", action="store_true", help="print an example EDL and exit")
     args = ap.parse_args()
     if args.example:
@@ -821,6 +1045,9 @@ def main() -> int:
     if not args.edl:
         ap.error("edl is required (or --example)")
     out_dir = Path(args.out_dir) if args.out_dir else None
+    if args.storyboard:
+        print(storyboard(Path(args.edl), args.ratio))
+        return 0
     if not args.all_ratios:
         render(Path(args.edl), args.ratio, args.captions, args.proxy, args.keep_tmp, out_dir)
         return 0
