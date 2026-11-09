@@ -1,0 +1,5 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.bar { position: absolute; left: 0; right: 0; top: calc(var(--safe-top) + 4px); height: 8px; background: rgba(255,255,255,.14); }
+.fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--primary)); transform-origin: left; animation: grow var(--dur) linear both; }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+</style></head><body><div class="stage"><div class="bar"><div class="fill"></div></div></div><script>{{harness}}</script></body></html>

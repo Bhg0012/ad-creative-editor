@@ -47,6 +47,8 @@ captions:
   words_per_chunk_max: 4       # 2-5
   uppercase: false
   keywords: []                 # words to force-highlight in accent color, e.g. ["reviews", "Huntsville"]
+  keywords_neg: []             # pain and cost words shown in red, e.g. ["losing", "cost", "missed"]
+  keywords_pos: []             # win and outcome words shown in green, e.g. ["booked", "ranked", "calls"]
   fixes: {}                    # transcript spelling fixes, e.g. {"auburn seo": "AuburnSEO", "opelika": "Opelika"}
 
 audio:

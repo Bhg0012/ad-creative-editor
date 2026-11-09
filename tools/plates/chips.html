@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.chips { padding: .8em .9em .9em; width: calc(var(--W) - 2 * var(--safe-side) - 0.08 * var(--W)); }
+.chips.in.center-x { animation-name: plate-in-x; } .chips.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.title { font-size: calc({{size}}px * .55); font-weight: 800; margin-bottom: .6em; color: var(--muted); }
+.title .acc { color: var(--accent); }
+.row { display: grid; grid-template-columns: repeat({{cols}}, 1fr); gap: 12px; }
+.chip { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: .55em .4em .5em; text-align: center; animation: plate-in .35s var(--spring) both; }
+.light .chip { background: rgba(15,17,21,.05); border-color: rgba(15,17,21,.1); }
+.chip b { display: block; font-size: {{size}}px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.chip small { display: block; margin-top: .15em; font-size: calc({{size}}px * .4); font-weight: 700; color: var(--muted); }
+</style></head><body><div class="stage">
+<div class="card chips in out center-x {{variant}} {{pos}}" style="{{style}}">
+  <div class="title">{{title}}</div>
+  <div class="row">{{chips_html}}</div>
+</div>
+</div><script>{{harness}}</script></body></html>

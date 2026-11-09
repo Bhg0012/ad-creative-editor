@@ -40,12 +40,15 @@ AI edits drift toward "busy and generic". These rules pull every ad toward one c
 - Cards are rounded (28 px at 1920 tall), dark at 86% over footage, with one soft shadow. Accent only for the one card that carries the number or the offer.
 - B-roll: one insert per idea, 1.5 to 3 s, cut in on the word it illustrates, cut out before the next idea. Picture-in-picture for anything with text (screenshots), full frame for action footage.
 - No transitions between A-roll clips (hard cuts). No dissolves except on a still, never on faces.
+- Framing grammar: full frame for the hook and the CTA (the face sells); `layout: split` for the mechanism and proof, where the speaker holds the bottom band and every card lands on the stage above him. Never put a card on a full-frame face when a split would do.
+- Card archetypes, one per idea: `label` for a line, `stat` for a number, `compare` for you vs them, `card` for a list, `step` for the sequence, `takeover` for the one number or word that is the ad, `strike` for what they tried before, `before_after` for a change, `grid` for "look how many", `pip` with `stamp` and `highlight` for a screenshot where one line matters. Pick by the idea, not by what looks cool.
+- Punches (`punches`) on at most 3-5 key words per 30 s, on the stressed syllable. Not on every sentence.
 
 ## Sound
 
 - Voice first, always intelligible with music muted. Music is a bed, 18 to 22 dB under the voice before ducking, ducked a further 10 to 15 dB while speaking.
 - Music energy matches the angle: minimal and low for pain and story, mid-tempo for mechanism and proof, lift on the CTA. Nothing with lyrics.
-- One SFX per visual event at most (whoosh on a B-roll cut, soft pop on a callout, ding on "review received"). Never on captions.
+- One SFX per visual event at most (soft pop or click on a card, thud on a takeover, ding on "review received"). A whoosh only when something crosses the frame. Never on captions.
 
 ## First frame rules (the thumbnail that stops the scroll)
 
@@ -58,6 +61,7 @@ AI edits drift toward "busy and generic". These rules pull every ad toward one c
 - Three or more text elements visible at once.
 - Any text touching the red safe-zone bands in the QA frames.
 - Captions wider than the face band; pages of 5+ words; captions that change faster than 3 per second.
+- A whoosh on a pop, a graphic over a mouth, a repeated word across a cut, a breathy lull longer half a second: the four tells of a machine cut. QA flags all four; fix them in the EDL.
 - Zoom past the footage's real resolution (soft face).
 - Music audible over consonants; a hard music stop at the end card.
 - A stock image, an AI-generated person, an emoji, or a flashing color.

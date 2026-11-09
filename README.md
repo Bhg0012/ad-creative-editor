@@ -50,10 +50,12 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/doctor.py` | Tools installed, config gaps, playbook freshness |
 | `tools/new_batch.py` | Scaffold a batch folder |
 | `tools/inventory.py` | ffprobe every file in `raw/` (rotation, VFR, HDR, resolution flags) and per-clip contact sheets |
-| `tools/transcribe.py` | Word-level transcripts (mlx-whisper, WhisperX, or faster-whisper, whichever is installed) |
+| `tools/transcribe.py` | Word-level transcripts (mlx-whisper, WhisperX, or faster-whisper, whichever is installed); `--split` transcribes each pause-separated take on its own |
 | `tools/selects.py` | Best take per script line from the transcripts, plus a draft EDL |
-| `tools/render.py` | EDL (yaml) to finished ad: reframe to 9:16 or 4:5 around the face, punch-ins, pause tightening, B-roll, hook text, lower third, ducked music, SFX, end card, two-pass loudness, captions. `--proxy` for rough cuts |
-| `tools/plates.py` | Motion plates: browser-rendered graphics (hook card, callouts, stat, compare, card, pip, lower third, end card, word-by-word captions) from one design system in `tools/plates/` |
+| `tools/render.py` | EDL (yaml) to finished ad: reframe to 9:16 or 4:5 around the face, punch-ins, zoom punches, pause tightening, split layout (speaker band plus graphics stage), B-roll, plates, hook text, lower third, ducked music, SFX, end card, two-pass loudness, captions mapped from the source transcripts (`--captions source`). `--proxy` for rough cuts, `--storyboard` for a contact sheet of every graphic |
+| `tools/plates.py` | Motion plates: browser-rendered graphics (hook card, callouts, stat, compare, card, step, grid, before/after, chips, frame label, takeover, strike, progress bar, backdrop, pip, lower third, end card, word-by-word captions) from one design system in `tools/plates/` |
+| `tools/capture.py` | Screenshots or scroll-through videos of web pages (your site, a Google Business Profile) as B-roll |
+| `tools/reference.py` | Measure a reference ad (cuts, change events per second by hook/body/CTA, loudness, music bed, contact sheet, frames) into a `.analysis.md` so its style can be copied as numbers |
 | `tools/sfx.py` | Synthesized default sound effects (pop, click, whoosh, ding, riser) until licensed ones are in `audio/sfx/` |
 | `tools/captions.py` | Caption file (.ass) from a transcript, the fast fallback engine: chunk, highlight, karaoke, reveal, or hormozi style |
 | `tools/statics.py` | Static image ads (4:5, 9:16) from a photo or a frame, headline + CTA inside the safe zone |

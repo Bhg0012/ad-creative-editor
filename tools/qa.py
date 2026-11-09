@@ -417,6 +417,79 @@ def plate_over_face(path: Path, sidecar: dict) -> list[dict]:
                   "none overlap" if not hits else "possible overlap: " + ", ".join(hits[:5]))]
 
 
+def seam_checks(path: Path, sidecar: dict) -> list[dict]:
+    """Every cut between A-roll segments: a butt-splice click (audio step) and a repeated word across the seam."""
+    import numpy as np
+
+    seams = [c["at"] for c in sidecar.get("clips", [])[1:] if c.get("src") != "end_card" and c["at"] > 0.05]
+    if not seams:
+        return []
+    clicks = []
+    for t in seams:
+        raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-ss", f"{max(0, t - 0.04):.3f}", "-t", "0.08", "-i", str(path),
+                              "-vn", "-ac", "1", "-ar", "48000", "-f", "s16le", "-"], capture_output=True).stdout
+        if len(raw) < 400:
+            continue
+        a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+        step = float(np.max(np.abs(np.diff(a))))
+        if step > 0.35:
+            clicks.append(f"{t:.2f}s ({step:.2f})")
+    res = [check("no clicks at cuts", "PASS" if not clicks else "WARN",
+                 "ok" if not clicks else "sample jumps at " + ", ".join(clicks[:6]) + "; add tighten_keep or move the cut")]
+    caps = sidecar.get("captions") or {}
+    wj = Path(caps.get("words_json", "")) if caps.get("words_json") else None
+    if wj and wj.is_file():
+        words = json.loads(wj.read_text())
+        dups = []
+        for t in seams:
+            before = [w for w in words if w["end"] <= t + 0.05 and w["end"] > t - 1.5]
+            after = [w for w in words if w["start"] >= t - 0.05 and w["start"] < t + 1.5]
+            if before and after:
+                a_ = re.sub(r"[^\w']", "", before[-1]["word"]).lower()
+                b_ = re.sub(r"[^\w']", "", after[0]["word"]).lower()
+                if len(a_) >= 3 and a_ == b_:
+                    dups.append(f"'{a_}' at {t:.2f}s")
+                elif len(before) >= 2 and len(after) >= 2:
+                    bg1 = [re.sub(r"[^\w']", "", w["word"]).lower() for w in before[-2:]]
+                    bg2 = [re.sub(r"[^\w']", "", w["word"]).lower() for w in after[:2]]
+                    if bg1 == bg2 and any(len(x) >= 3 for x in bg1):
+                        dups.append(f"'{' '.join(bg1)}' at {t:.2f}s")
+        res.append(check("no repeated words across cuts", "PASS" if not dups else "FAIL",
+                         "ok" if not dups else "a retake survived: " + "; ".join(dups[:5])))
+    return res
+
+
+def lull_scan(path: Path, threshold_db: float = -27.0, min_dur: float = 0.5) -> list[dict]:
+    """Breathy lulls at -28 to -36 dB read as dead air to a viewer but pass silencedetect; scan a 50 ms RMS envelope."""
+    import numpy as np
+
+    raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"],
+                         capture_output=True).stdout
+    a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+    win = 800  # 50 ms
+    n = len(a) // win
+    if n < 10:
+        return []
+    rms = np.sqrt(np.mean(a[: n * win].reshape(n, win) ** 2, axis=1))
+    db = 20 * np.log10(np.maximum(rms, 1e-6))
+    low = db < threshold_db
+    runs, i = [], 0
+    while i < n:
+        if low[i]:
+            j = i
+            while j < n and low[j]:
+                j += 1
+            dur = (j - i) * 0.05
+            start = i * 0.05
+            if dur >= min_dur and start > 0.5 and (j * 0.05) < n * 0.05 - 0.5:
+                runs.append((start, dur))
+            i = j
+        else:
+            i += 1
+    return [check("no breathy lulls over 0.5s", "PASS" if not runs else "WARN",
+                  "ok" if not runs else "quiet stretches at " + ", ".join(f"{s:.1f}s ({d:.1f}s)" for s, d in runs[:6]) + "; tighten or cover with a graphic")]
+
+
 def first_frame_signature(path: Path) -> bytes:
     return subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-i", str(path), "-frames:v", "1",
                            "-vf", "scale=32:32,format=gray", "-f", "rawvideo", "-"],
@@ -468,8 +541,10 @@ def qa_one(path: Path, qa_dir: Path, target: float, tp_max: float, script: Path 
     if "width" in meta:
         results += face_checks(path, sidecar, meta["duration"])
         results += frame_scan(path)
+        results += lull_scan(path)
         if sidecar:
             results += plate_over_face(path, sidecar)
+            results += seam_checks(path, sidecar)
         evidence(path, out, meta)
     results += [check(m, "MANUAL", "look at the images in this folder") for m in MANUAL_CHECKS]
     report = {"file": str(path), **meta, "results": results}

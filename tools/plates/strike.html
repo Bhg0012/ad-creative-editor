@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.list { padding: .8em 1em .9em; width: calc(var(--W) - 2 * var(--safe-side) - 0.08 * var(--W)); }
+.list.in.center-x { animation-name: plate-in-x; } .list.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.title { font-size: calc({{size}}px * .6); font-weight: 700; color: var(--muted); margin-bottom: .5em; letter-spacing: .04em; text-transform: uppercase; }
+.row { position: relative; font-size: {{size}}px; font-weight: 800; padding: .25em 0; animation: plate-in .3s var(--spring) both; }
+.row i { position: absolute; left: -.1em; right: -.1em; top: 50%; height: .12em; margin-top: -.06em; background: #e04545; border-radius: .06em; transform-origin: left; transform: scaleX(0); animation: strike .28s var(--ease-out) both; }
+.row.dead { opacity: .55; }
+@keyframes strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.answer { margin-top: .4em; font-size: calc({{size}}px * 1.1); font-weight: 800; color: #fff; background: var(--accent); border-radius: 16px; padding: .25em .5em; display: inline-block; animation: plate-in .38s var(--spring) both; }
+</style></head><body><div class="stage">
+<div class="card list in out center-x {{variant}} {{pos}}" style="{{style}}">
+  <div class="title">{{title}}</div>
+  {{rows_html}}
+  <div class="answer" style="animation-delay:{{answer_delay}}s">{{answer}}</div>
+</div>
+</div><script>{{harness}}</script></body></html>

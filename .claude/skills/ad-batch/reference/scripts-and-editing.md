@@ -38,6 +38,10 @@ Every ad is described by `work/edl/<adname>.yaml` (print a template with `tools/
 | `broll[]` | Picture-only overlays: `src`, `at`, `duration`, `src_in`, optional `label` text. The voice keeps playing. Add `pip: {w: 0.7, x: 0.5, y: 0.4}` for a picture-in-picture inset (screenshots, phone photos, HEIC is fine) instead of full frame. |
 | `callouts[]` | Short on-screen text mid-video: `text`, `at`, `duration`, `position` (top, center, lower), `accent: true` for the orange box. Use for the number, the re-hook, the offer line. Always labeled "(example)" when the number is not real. |
 | `slot` on a clip | A name (`hook`, `offer`, `cta`) that `tools/variants.py` can swap. |
+| `layout: split` on a clip | The speaker drops into a band across the bottom 44% of the frame over the brand `backdrop` (dark navy grid and glow; override with `backdrop: {bg, bg2}` at the EDL root). Graphics with `position: stage` land centred in the open stage above him. Use it for the mechanism and proof section; go back to full frame for the hook and the CTA. |
+| `progress_bar: true` | Thin brand-gradient bar across the top for the whole ad. |
+| `punches: [9.4, 15.2]` | Quick 1.07x zoom punches on these key-word times (in over 0.15 s, back over 0.35 s). Finals only; proxies skip them. |
+| `caption_keywords_neg`, `caption_keywords_pos` | Words shown red (pain, cost) or green (wins) in the captions, on top of `captions.keywords_neg/pos` in `config.yaml`. |
 | `look` | Optional light grade for A-roll: `contrast`, `brightness`, `saturation`, `gamma`, `sharpen`. Keep it subtle (1.03-1.08); phone footage is already contrasty. |
 | `hook_text`, `hook_text_seconds` | Headline from frame 1, inside the top safe zone, with a dark box. Max about 7 words. |
 | `lower_third` | `text`, `at`, `duration`: name + "Auburn, AL" in the accent color, above the caption band. |
@@ -48,6 +52,8 @@ Every ad is described by `work/edl/<adname>.yaml` (print a template with `tools/
 The output sidecar `exports/<adname>.render.json` lists where every clip, overlay, and graphic landed on the timeline.
 
 ## Captions
+
+Caption from the SOURCE, never the cut: run `tools/transcribe.py raw/*.mov --out work/transcripts` once (add `--split` for multi-take raws so every attempt at a line stays visible), then `tools/render.py <edl> --captions source`. The engine maps each take's word timings through the clip map, so timings are exact and a surviving retake shows up as a repeated word in QA. `--captions auto` (re-transcribing the master) is the fallback when a raw file has no transcript.
 
 - Burned in on every ad. Meta calls captions "recommended" and sound "strongly recommended": design for both sound off and sound on.
 - Pipeline: `tools/render.py` renders the master, `tools/transcribe.py` transcribes it, `tools/render.py --captions <words.json>` burns the captions. This keeps captions frame-accurate to the final timeline. Fix recurring transcription errors via `captions.fixes` in `config.yaml`, not by hand-editing. For the tightest word timing (karaoke styles) install WhisperX; mlx-whisper is fine for `chunk`.
@@ -77,6 +83,17 @@ Every graphic is a motion plate: an HTML template in `tools/plates/` filled from
 | `plates[] type: stat` | big number counting up, `prefix`, `suffix`, `label` | the one figure that matters |
 | `plates[] type: compare` | two growing bars with values, `title`, `left`, `right`, `note` | you vs them, before vs after |
 | `plates[] type: card` | title plus up to 5 ticked lines appearing one by one | what they get, the steps |
+| `plates[] type: step` | numbered pill at the top ("01 We text your customers") | each step of the mechanism |
+| `plates[] type: grid` | thumbnails pulled from a clip (`src`, `count`) plus a count headline | "every job we found", "20 reviews" |
+| `plates[] type: before_after` | pill label, waveform, old value struck through, new value in green | time saved, reviews before and after |
+| `plates[] type: chips` | grid of short words with sub-labels | what is included |
+| `plates[] type: frame_label` | corner brackets, REC dot, running timecode | "raw footage" moments, behind the scenes |
+| `plates[] type: label` with `variant: boxes` | each word in a white box, `*word*` in accent | section titles mid-video |
+| `plates[] type: takeover` | one giant word or number filling the frame (`text`, `sub`, `bg: dark|light|#hex`), low thud | the number of the ad, a one-word turn ("Nine.") |
+| `plates[] type: strike` | `title`, `items` struck through one by one, then `answer` in accent | "what everyone tries" before the mechanism |
+| `broll[]` still with `pip.stamp` and `pip.highlight: {x, y, w, h}` | a corner stamp ("LIVE", "RAW") and a highlighted band over the line that matters | screenshots where one line is the point |
+| `position: stage` on any plate | centred in the open stage above a `layout: split` speaker | every card in the split section |
+| `hook_variant: light`, `hook_uppercase: true` | white box, black ALL CAPS headline | the creator-ad hook look (reference 2) |
 | `broll[]` still with `pip` | rounded, shadowed inset with slow zoom; `pip.device: phone` adds a bezel; `label` becomes a caption | screenshots, review cards, photos |
 | `broll[]` video with `pip` | rounded, shadowed video inset | a phone screen recording over the speaker |
 | `broll[]` with `speaker_inset: {w, x, y}` | the B-roll fills the frame and the speaker stays in a rounded corner inset (from the A-roll, lip sync untouched) | "the screen is the set": a screen recording or dashboard while the mechanism is explained (`brand/DESIGN.md`, reference 1) |
@@ -84,7 +101,7 @@ Every graphic is a motion plate: an HTML template in `tools/plates/` filled from
 | `end_card` | brand background, logo pop, `headline`, pulsing CTA button, `subtext` | the last 2-3 s |
 | `captions` (config `captions.engine: html`) | word-timed pages, `pill` (spoken word in an accent pill), `highlight`, or `clean` | every ad |
 
-Positions: `position: top | center | lower` (center means the card's centre at 38% of the frame, above the caption band). Preview every plate on its frame with `tools/render.py <edl> --storyboard` before rendering; one still per type with `tools/plates.py demo --out work/plates_demo`.
+Positions: `position: top | center | lower | stage` (center means the card's centre at 38% of the frame, above the caption band; stage is the open area above a `layout: split` speaker). Web pages as B-roll: `.venv/bin/python tools/capture.py <url> --out raw/broll_site.png` (or `--scroll 6 --out raw/broll_site.mp4` for a scroll-through), then use it as a `pip` or `speaker_inset` B-roll. Preview every plate on its frame with `tools/render.py <edl> --storyboard` before rendering; one still per type with `tools/plates.py demo --out work/plates_demo`.
 
 Only when a concept needs something these templates cannot do (a chart, a map, a phone mockup with scrolling): add a template to `tools/plates/` following the same structure (theme include, `.in`/`.out` classes, `{{placeholders}}`, the harness script) and register it in `tools/plates.py`. For animated counters, review cards, phone mockups, draw-on arrows, before/after splits, and lower thirds, use Remotion in `graphics/` (Node/React; Remotion's license is free for individuals and companies of up to 3 people; confirm at remotion.dev before using it if AuburnSEO grows past that). Keep one reusable composition per graphic type so later batches reuse them.
 
@@ -98,7 +115,7 @@ Only when a concept needs something these templates cannot do (a chart, a map, a
 
 - **Voice first:** high-pass ~80 Hz, gentle de-ess, light compression, noise reduction only if needed. It must not sound processed.
 - **Music:** only from `audio/music` with an ad-use license on file, or Meta Sound Collection. Never in-app trending music. Energy matches angle (upbeat for opportunity, minimal for pain). Duck under VO by roughly 15-20 dB. Hit a musical change on the CTA if possible.
-- **SFX** from `audio/sfx`, sparingly: whoosh on transitions, soft pop on text, ding on "review received" or "phone ringing" moments, riser into the proof. Always below the voice.
+- **SFX** from `audio/sfx`, sparingly: soft pop or click on a card, ding on "review received" or "phone ringing" moments, thud under a takeover, riser into the proof. A whoosh only when something actually crosses the frame (a swipe, a scroll), never on a pop; whooshes on every graphic are the loudest "AI edit" tell. Always below the voice.
 - **Loudness:** two-pass `loudnorm` to `audio.target_lufs` and `audio.true_peak_max_dbtp` from `config.yaml`; `tools/qa.py` verifies.
 - Silence test (sound off still makes complete sense) and eyes-closed test (sound alone still makes sense).
 

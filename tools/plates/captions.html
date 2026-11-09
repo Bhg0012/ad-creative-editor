@@ -13,7 +13,12 @@
 @keyframes w-color { from { color: var(--accent); transform: scale(1.03); } to { color: var(--accent); transform: scale(1.03); } }
 .style-clean .w.on { animation: none; }
 .w.key { color: var(--accent); }
+.w.key.neg { color: #ff5c5c; } .w.key.pos { color: #3ddc84; }
 .style-pill .w.key { color: #fff; }
+.style-pill .w.on.neg { animation-name: w-on-neg; } .style-pill .w.on.pos { animation-name: w-on-pos; }
+@keyframes w-on-neg { from { background: #d12d3a; color: #fff; transform: scale(1.03); text-shadow: none; } to { background: #d12d3a; color: #fff; transform: scale(1.03); text-shadow: none; } }
+@keyframes w-on-pos { from { background: #1f9d5a; color: #fff; transform: scale(1.03); text-shadow: none; } to { background: #1f9d5a; color: #fff; transform: scale(1.03); text-shadow: none; } }
+.style-box .w.key.neg { background: #d12d3a; } .style-box .w.key.pos { background: #1f9d5a; }
 /* box: ALL CAPS, one line of 3-4 words, the key word sits in a solid accent box with a small radius (reference: creator ads, Nov 2026). */
 .style-box { text-transform: uppercase; }
 .style-box .page { font-family: var(--caption-font); font-size: calc({{size}}px * 1.08); letter-spacing: .01em; text-shadow: 0 2px 0 rgba(0,0,0,.85), 0 0 12px rgba(0,0,0,.5); -webkit-text-stroke: 1.5px rgba(0,0,0,.9); paint-order: stroke fill; }

@@ -33,6 +33,8 @@ details{margin:6px 0}summary{cursor:pointer;color:#93c5fd}pre{white-space:pre-wr
 JS = """
 function copyNotes(){const out=[];document.querySelectorAll('textarea').forEach(t=>{if(t.value.trim())out.push('## '+t.dataset.ad+'\\n'+t.value.trim())});
 const txt=out.join('\\n\\n')||'(no notes)';navigator.clipboard.writeText(txt).then(()=>alert('Notes copied. Paste them into the chat.'));}
+function stamp(btn){const sec=btn.closest('section');const v=sec.querySelector('video');const t=sec.querySelector('textarea');
+const s=v.currentTime;const m=Math.floor(s/60),ss=(s%60).toFixed(1).padStart(4,'0');t.value=(t.value?t.value.replace(/\\s*$/,'')+'\\n':'')+m+':'+ss+'  ';t.focus();}
 """
 
 
@@ -102,7 +104,8 @@ def build(batch: Path) -> Path:
             copy_md = batch / "exports" / f"{stem}_copy.md"
             if copy_md.exists():
                 parts.append("<details><summary>Copy package</summary><pre>" + html.escape(copy_md.read_text()) + "</pre></details>")
-            parts.append(f"<textarea data-ad='{html.escape(f.name)}' placeholder='Notes for this ad (what to change, timecodes)'></textarea></div></section>")
+            parts.append(f"<textarea data-ad='{html.escape(f.name)}' placeholder='Notes for this ad. Pause the video and tap Stamp time to insert the timecode.'></textarea>"
+                         f"<button onclick='stamp(this)'>Stamp time</button></div></section>")
     if statics:
         parts.append("<h2 style='padding:16px 20px 0'>Statics</h2><div style='display:flex;flex-wrap:wrap;gap:12px;padding:20px'>")
         for s in statics:
