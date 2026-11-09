@@ -5,6 +5,11 @@
 @keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
 @keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
 .emoji { font-size: 1.1em; margin-right: .25em; }
+.label em { font-style: normal; color: var(--accent); }
+/* boxes: every word in its own white box, the *marked* word in the accent box (reference 2) */
+.boxes { background: none !important; box-shadow: none !important; padding: 0 !important; text-transform: uppercase; letter-spacing: .02em; }
+.boxes .bw { display: inline-block; background: #fff; color: var(--ink); padding: .12em .35em; margin: 0 .08em; border-radius: .14em; box-shadow: var(--shadow); animation: plate-in .3s var(--spring) both; }
+.boxes .bw.acc { background: var(--accent); color: #fff; }
 </style></head><body><div class="stage">
 <div class="card label in out center-x {{variant}} {{pos}}" style="{{style}}"><span class="emoji">{{emoji}}</span>{{text}}</div>
 </div><script>{{harness}}</script></body></html>

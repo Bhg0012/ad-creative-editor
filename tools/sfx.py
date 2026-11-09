@@ -26,6 +26,12 @@ RECIPES = {
     "ding": ("sine=frequency=1320:sample_rate=48000:duration=0.7", "afade=t=out:st=0.05:d=0.65,volume=0.5"),
     # riser: rising tone into the CTA
     "riser": ("sine=frequency=220:sample_rate=48000:duration=1.2", "afade=t=in:d=0.6,afade=t=out:st=1.0:d=0.2,volume=0.35"),
+    # thud: low impact for a big number landing
+    "thud": ("sine=frequency=70:sample_rate=48000:duration=0.35", "afade=t=in:d=0.003,afade=t=out:st=0.05:d=0.3,volume=0.9"),
+    # swipe: short airy sweep for a card sliding in
+    "swipe": ("anoisesrc=c=pink:r=48000:a=0.8:d=0.25", "highpass=f=900,lowpass=f=7000,afade=t=in:d=0.05,afade=t=out:st=0.1:d=0.15,volume=0.7"),
+    # sub: a soft low pulse under a reveal
+    "sub": ("sine=frequency=45:sample_rate=48000:duration=0.6", "afade=t=in:d=0.08,afade=t=out:st=0.2:d=0.4,volume=0.7"),
 }
 
 

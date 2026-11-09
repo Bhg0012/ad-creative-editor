@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.ba { padding: .7em 1em .8em; text-align: center; min-width: 50%; }
+.ba.in.center-x { animation-name: plate-in-x; } .ba.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.tag { display: inline-block; font-size: calc({{size}}px * .36); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: .25em .8em; border-radius: 999px; background: {{tag_color}}; color: #fff; }
+.wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: calc({{size}}px * 1.1); margin: .5em 0 .4em; }
+.wave i { display: block; width: 5px; border-radius: 3px; background: {{wave_color}}; transform-origin: center; animation: w .9s ease-out both; }
+@keyframes w { from { transform: scaleY(.05); } to { transform: scaleY(1); } }
+.vals { font-size: {{size}}px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.from { text-decoration: line-through; text-decoration-thickness: .08em; opacity: .55; }
+.arrow { margin: 0 .25em; opacity: .9; }
+.to { color: {{to_color}}; animation: plate-in .4s var(--spring) both; animation-delay: .55s; display: inline-block; }
+.sub { margin-top: .25em; font-size: calc({{size}}px * .32); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+</style></head><body><div class="stage">
+<div class="card ba in out center-x {{variant}} {{pos}}" style="{{style}}">
+  <div class="tag">{{label}}</div>
+  <div class="wave">{{bars_html}}</div>
+  <div class="vals"><span class="from">{{from}}</span><span class="arrow">&#8594;</span><span class="to">{{to}}</span></div>
+  <div class="sub">{{sub}}</div>
+</div>
+</div><script>{{harness}}</script></body></html>

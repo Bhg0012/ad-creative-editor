@@ -46,7 +46,7 @@ RATIO_TOKEN = {"9:16": "9x16", "4:5": "4x5", "1:1": "1x1"}
 
 ENC_INTER = ["-c:v", "libx264", "-preset", "fast", "-crf", "16", "-pix_fmt", "yuv420p"]
 ENC_FINAL = ["-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high", "-pix_fmt", "yuv420p"]
-ENC_PROXY = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p"]
+ENC_PROXY = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-g", "30", "-keyint_min", "30"]
 AUD_ENC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
 AUD_NORM = "aresample=48000:async=1,aformat=sample_fmts=fltp:channel_layouts=stereo"
 HDR_TO_SDR = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,"
@@ -70,23 +70,35 @@ def edl_example() -> str:
     return """# Edit decision list for one ad. Paths are relative to the repo root.
 name: HSV_reviews_lostjobs_question_30s_9x16_v1
 ratio: "9:16"                 # 9:16 Reels/Stories, 4:5 Feed. Override with --ratio.
-hook_text: "Huntsville roofers: 9 reviews?"   # on screen from frame 1, max ~7 words
+hook_text: "Huntsville roofers: 9 reviews?"   # on screen from frame 1, max ~7 words; *word* turns accent
+hook_variant: dark            # dark | light (white box, black text)  hook_uppercase: true for ALL CAPS
 hook_text_seconds: 3
-clips:                        # A-roll in timeline order; in/out are seconds in the source
+progress_bar: true            # thin brand-gradient bar across the top for the whole ad (retention device)
+punches: [9.4, 15.2]          # quick 1.07x zoom punches on these key words
+clips:                        # A-roll in timeline order; in/out are seconds in the source. `layout: split` puts the
+                              # speaker in a bottom band over the brand backdrop and gives graphics the stage above (position: stage)
   - {src: raw/take3.mov, in: 12.40, out: 15.90, zoom: 1.0, focus: auto, slot: hook}   # slot: a name variants can swap
-  - {src: raw/take3.mov, in: 21.10, out: 26.75, zoom: 1.10, tighten: 0.45}
+  - {src: raw/take3.mov, in: 21.10, out: 26.75, zoom: 1.10, tighten: 0.45, layout: split}
   - {src: raw/take5.mov, in: 3.00, out: 8.20, push: 1.08}   # slow push from 1.0 to 1.08
   - {src: raw/screenshot.png, duration: 2.5, push: 1.12}    # still image, Ken Burns push
 broll:                        # picture-only overlays on the timeline; the voice continues
   - {src: raw/phone_text.mov, at: 6.0, duration: 2.5, src_in: 0.0, label: "A text goes out"}
   - {src: raw/screen_recording.mov, at: 9.0, duration: 4.0, speaker_inset: {w: 0.40, x: 0.76, y: 0.70}}  # screen full frame, speaker in a corner inset
-  - {src: raw/review_screenshot.heic, at: 14.0, duration: 2.0, pip: {w: 0.72, x: 0.5, y: 0.40}}  # picture-in-picture
+  - {src: raw/review_screenshot.heic, at: 14.0, duration: 2.0, pip: {w: 0.72, x: 0.5, y: 0.40, stamp: "Old way", highlight: {x: 0.05, y: 0.42, w: 0.9, h: 0.06}}}  # inset with a slammed stamp and a highlight band
 callouts:                     # short on-screen text mid-video: a number, a re-hook, a label (rendered as animated cards)
   - {text: "$4,800 roof job (example)", at: 9.0, duration: 2.0, position: center, accent: true}
-plates:                       # richer motion graphics (tools/plates.py): stat, compare, card, label, pip
-  - {type: compare, title: "Same work. Different phone.", left: {label: You, value: 9}, right: {label: "The other guy", value: 140}, note: "Google reviews (example)", at: 4.0, duration: 3.0}
-  - {type: stat, value: 140, suffix: " reviews", label: "your competitor (example)", at: 12.0, duration: 2.5}
-  - {type: card, title: "You get", items: ["Review requests sent for you", "Replies written for you", "Monthly report by text"], at: 18.0, duration: 3.5}
+plates:                       # richer motion graphics (tools/plates.py): stat, compare, card, step, grid, before_after, chips, frame_label, label, pip
+  - {type: compare, title: "Same work. Different phone.", left: {label: You, value: 9}, right: {label: "The other guy", value: 140}, note: "Google reviews (example)", at: 4.0, duration: 3.0, position: stage}
+  - {type: takeover, text: "*Nine*\nreviews.", sub: "example", bg: dark, at: 7.5, duration: 1.3}       # one giant word, max 3 per ad
+  - {type: strike, title: "What everyone tries", items: ["Asking in person", "A sign at the counter", "Hoping"], answer: "A text, the same day", at: 9.0, duration: 4.0}
+  - {type: stat, value: 4095186, label: "views (example)", at: 12.0, duration: 2.5}      # counts up with commas
+  - {type: step, number: "01", text: "We text your customers", at: 8.0, duration: 2.5}   # numbered step pill at the top
+  - {type: grid, src: raw/take3.mov, count: 12, text: "cuts found", tag: cut, at: 14.0, duration: 3.0}   # thumbnails from a clip
+  - {type: before_after, label: "Dead space", bad: true, from: "12.5s", to: "4.9s", sub: "pauses removed", at: 17.0, duration: 2.5}
+  - {type: chips, title: "What you *get*", items: [{text: Texts, sub: automatic}, {text: Replies, sub: written for you}, {text: Report, sub: monthly}], at: 19.5, duration: 3.0}
+  - {type: frame_label, text: "Raw footage", timecode_from: 12.0, at: 2.0, duration: 2.0}   # corner brackets + REC tag
+  - {type: label, text: "THE *MOTION* GRAPHICS", variant: boxes, position: lower, at: 22.0, duration: 2.0}
+  - {type: card, title: "You get", items: ["Review requests sent for you", "Replies written for you", "Monthly report by text"], at: 24.0, duration: 3.5}
 lower_third: {text: "Bruce, Auburn AL", at: 1.0, duration: 3.0}
 look: {contrast: 1.04, saturation: 1.08, sharpen: true}   # optional light grade on A-roll only
 music: {src: audio/music/track.mp3, gain_db: -18, duck: true, fade_out: 1.0}
@@ -153,6 +165,7 @@ def load_edl(path: Path, ratio_override: str | None = None) -> dict:
     if ratio not in SAFE_ZONES:
         raise SystemExit(f"ratio {ratio!r} must be one of {list(SAFE_ZONES)}")
     edl["ratio"] = ratio
+    edl["_path"] = str(path.resolve())
     name = edl["name"]
     for other, tok in RATIO_TOKEN.items():
         if other != ratio and f"_{tok}_" in name:
@@ -365,31 +378,49 @@ def video_filters(src_w: int, src_h: int, hdr: bool, ratio: str, out_w: int, out
     return ",".join(f)
 
 
+SPLIT_BAND = 0.4375   # the speaker band in `layout: split` is the bottom 43.75% of the frame (840 of 1920)
+
+
 def render_segment(clip: dict, t_in: float, t_out: float, out: Path, ratio: str, out_w: int, out_h: int,
                    fps: int, enc: list[str], focus: tuple[float, float], timecode_from: float | None = None,
-                   font: str | None = None) -> None:
+                   font: str | None = None, backdrop: Path | None = None) -> None:
     v = clip["vstream"]
     src_w, src_h = display_size(v)
     dur = t_out - t_in
-    vf = video_filters(src_w, src_h, is_hdr(v), ratio, out_w, out_h, fps, focus,
-                       float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"), clip.get("_settle"))
+    split = clip.get("layout") == "split" and backdrop is not None
+    if split:
+        # The speaker lives in a band at the bottom; the graphics stage above sits on the brand backdrop.
+        band_h = even(out_h * SPLIT_BAND)
+        band_ratio = f"{out_w}:{band_h}"
+        vf = video_filters(src_w, src_h, is_hdr(v), band_ratio, out_w, band_h, fps, (focus[0], min(focus[1] + 0.08, 0.6)),
+                           float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"), clip.get("_settle"))
+        vf = f"[0:v]{vf}[band];[1:v][band]overlay=0:{out_h - band_h}:shortest=1,format=yuv420p"
+    else:
+        vf = video_filters(src_w, src_h, is_hdr(v), ratio, out_w, out_h, fps, focus,
+                           float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"), clip.get("_settle"))
     if timecode_from is not None and font:
         vf += (f",drawtext=fontfile='{font}':text='%{{pts\\:hms\\:{timecode_from:.3f}}}':fontsize={max(18, out_h // 30)}:"
                f"fontcolor=white:box=1:boxcolor=black@0.6:x=10:y=10")
     args = []
     if clip["still"]:
         args += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", str(clip["path"])]
-        args += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
-        args += ["-map", "0:v:0", "-map", "1:a:0"]
     else:
         args += ["-ss", f"{t_in:.3f}", "-t", f"{dur:.3f}", "-i", str(clip["path"])]
-        if clip["astream"] is None:
-            args += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo", "-map", "0:v:0", "-map", "1:a:0"]
-        else:
-            args += ["-map", "0:v:0", "-map", "0:a:0"]
+    if split:
+        args += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", str(backdrop)]
+    a_idx = 2 if split else 1
+    if clip["still"] or clip["astream"] is None:
+        args += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+        a_map = f"{a_idx}:a:0"
+    else:
+        a_map = "0:a:0"
     # 30 ms fades at every cut so hard cuts never click or pop.
     af = f"{AUD_NORM},afade=t=in:d={CUT_FADE},afade=t=out:st={max(0.0, dur - CUT_FADE):.3f}:d={CUT_FADE}"
-    args += ["-vf", vf, "-af", af, *enc, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+    if split:
+        args += ["-filter_complex", vf + "[out]", "-map", "[out]", "-map", a_map]
+    else:
+        args += ["-vf", vf, "-map", "0:v:0", "-map", a_map]
+    args += ["-af", af, *enc, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
              "-shortest", "-video_track_timescale", "90000", str(out)]
     run_ffmpeg(args)
 
@@ -494,6 +525,29 @@ def apply_editor_defaults(edl: dict, cfg: dict) -> None:
             c["_settle"] = None
 
 
+def grid_frames(spec: dict, edl: dict) -> list[str]:
+    """Thumbnails for a grid plate from a source clip: `count` frames spread over `src_in`..`src_out` (or the whole file)."""
+    import hashlib
+
+    src = resolve(str(spec["src"]), Path(edl.get("_path", ".")).parent)
+    count = int(spec.get("count") or 12)
+    info = probe(src)
+    dur = float(info["format"]["duration"])
+    a = float(spec.get("src_in") or 0.0)
+    b = float(spec.get("src_out") or dur)
+    tag = hashlib.md5(f"{src}{a}{b}{count}".encode()).hexdigest()[:8]
+    out_dir = batch_dir_of(Path(edl.get("_path", "."))) / "work" / "cuts" / f"grid_{tag}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for i in range(count):
+        t = a + (b - a) * (i + 0.5) / count
+        p = out_dir / f"{i:02d}.jpg"
+        if not p.exists():
+            run_ffmpeg(["-ss", f"{t:.3f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=-2:480", "-q:v", "4", str(p)])
+        paths.append(str(p))
+    return paths
+
+
 # ---------- motion plates (browser-rendered graphics) ----------
 
 def plates_available(cfg: dict) -> bool:
@@ -513,7 +567,7 @@ def plate_specs(edl: dict, cfg: dict) -> list[dict]:
     if edl.get("hook_text"):
         specs.append({"type": "hook", "text": str(edl["hook_text"]), "at": 0.0,
                       "duration": float(edl.get("hook_text_seconds") or DEFAULTS["hook_text_seconds"]),
-                      "variant": str(edl.get("hook_variant") or "dark")})
+                      "variant": str(edl.get("hook_variant") or "dark"), "uppercase": bool(edl.get("hook_uppercase"))})
     lt = edl.get("lower_third")
     if lt and lt.get("text"):
         text, sub = str(lt["text"]), str(lt.get("sub") or "")
@@ -532,7 +586,13 @@ def plate_specs(edl: dict, cfg: dict) -> list[dict]:
     for pl in edl.get("plates") or []:
         sp = dict(pl)
         sp.setdefault("duration", 2.5)
+        if sp.get("type") == "grid" and sp.get("src") and not sp.get("images"):
+            sp["images"] = grid_frames(sp, edl)
+        if sp.get("position") == "stage":
+            sp["position"] = str(1 - SPLIT_BAND / 2 - 0.5 + 0.03)   # centre of the stage above the speaker band (about 31%)
         specs.append(sp)
+    if edl.get("progress_bar"):
+        specs.append({"type": "progress", "at": 0.0, "duration": float(edl.get("_total") or 0) or 1.0})
     lead = float((cfg.get("graphics") or {}).get("lead_s") or 0.0)
     for sp in specs:
         if "at" not in sp:
@@ -684,6 +744,7 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
     html_engine = (not proxy) and plates_available(cfg)
     if html_engine:
         # Browser-rendered motion plates: hook, callouts, lower third, cards, stats, pip images. Flat drawtext is the fallback.
+        edl["_total"] = total
         specs = plate_specs(edl, cfg)
         if specs:
             import plates as pl  # noqa: WPS433
@@ -744,6 +805,17 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
                           f"enable='between(t,{at:.3f},{at + dur:.3f})'[lt]")
             cur = "[lt]"
             timeline["graphics"].append({"type": "lower_third", "text": lt["text"], "at": at, "duration": dur})
+    punches = [float(x) if not isinstance(x, dict) else float(x["at"]) for x in (edl.get("punches") or [])] if not proxy else []
+    if punches:
+        # 1.07x punch over 0.15 s, back over 0.35 s, on each listed word time (the retention device from branded ads).
+        amt = 0.07
+        terms = "+".join(f"between(t,{a:.3f},{a + 0.15:.3f})*((t-{a:.3f})/0.15)+between(t,{a + 0.15:.3f},{a + 0.5:.3f})*(1-(t-{a + 0.15:.3f})/0.35)"
+                         for a in punches)
+        grow = f"(1+{amt}*({terms}))"
+        vchain.append(f"{cur}scale=w='trunc({out_w}*{grow}/2)*2':h='trunc({out_h}*{grow}/2)*2':eval=frame,"
+                      f"crop={out_w}:{out_h}:(iw-{out_w})/2:(ih-{out_h})/2[punched]")
+        cur = "[punched]"
+        timeline["punches"] = punches
     vchain.append(f"{cur}format=yuv420p[vout]")
 
     # Audio
@@ -867,6 +939,8 @@ def build_caption_plate(words_json: Path, out_w: int, out_h: int, total: float, 
         style = {"chunk": "clean", "karaoke": "pill", "reveal": "pill", "hormozi": "pill"}.get(style, "pill")
     keywords = [k for k in (c.get("keywords") or [])] + [k for k in (edl.get("caption_keywords") or [])]
     spec = {"type": "captions", "words": words, "style": style, "keywords": keywords,
+            "keywords_neg": list(c.get("keywords_neg") or []) + list(edl.get("caption_keywords_neg") or []),
+            "keywords_pos": list(c.get("keywords_pos") or []) + list(edl.get("caption_keywords_pos") or []),
             "max_words": max(2, min(5, int(c.get("words_per_chunk_max") or 4))), "uppercase": bool(c.get("uppercase")),
             "duration": total}
     r = pl.Renderer(out_w, out_h)
@@ -882,6 +956,36 @@ def finalize_with_plate(comp: Path, out: Path, lf: str, plate: Path, enc: list[s
     run_ffmpeg(["-i", str(comp), "-i", str(plate), "-filter_complex",
                 "[1:v]format=rgba[c];[0:v][c]overlay=format=auto:eof_action=pass,format=yuv420p[v]",
                 "-map", "[v]", "-map", "0:a:0", "-af", lf, *enc, "-r", str(fps), *AUD_ENC, "-movflags", "+faststart", str(out)])
+
+
+def words_from_sources(edl: dict, timeline: dict, transcripts: Path, out: Path) -> Path | None:
+    """Map word timings of the source takes onto the master timeline through the clip map.
+
+    This is the repo-proven way to caption a cut: transcribe the SOURCE once, never the cut
+    (whisper on a concatenated cut drifts late and dedupes retakes). Words whose midpoint falls
+    inside a kept range are shifted; words in removed pauses are dropped."""
+    merged = []
+    found_any = False
+    for seg in timeline["clips"]:
+        if seg["src"] == "end_card":
+            continue
+        stem = Path(seg["src"]).stem
+        wj = transcripts / f"{stem}.words.json"
+        if not wj.exists():
+            continue
+        found_any = True
+        for w in json.loads(wj.read_text()):
+            mid = (w["start"] + w["end"]) / 2
+            if seg["src_in"] <= mid <= seg["src_out"]:
+                off = seg["at"] - seg["src_in"]
+                start = max(w["start"], seg["src_in"]) + off
+                end = min(w["end"], seg["src_out"]) + off
+                merged.append({**w, "start": round(start, 3), "end": round(max(end, start + 0.05), 3)})
+    if not found_any:
+        return None
+    merged.sort(key=lambda w: w["start"])
+    out.write_text(json.dumps(merged, indent=1))
+    return out
 
 
 def transcribe_master(master: Path, out_dir: Path) -> Path | None:
@@ -960,6 +1064,16 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         segments, t = [], 0.0
         timeline_clips = []
         keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
+        backdrop = None
+        if any(c.get("layout") == "split" for c in edl["clips"]) and plates_available(cfg):
+            import plates as pl  # noqa: WPS433
+
+            backdrop = tmp / "backdrop.png"
+            r = pl.Renderer(out_w, out_h)
+            try:
+                r.render_still(pl.build_html({"type": "backdrop", "duration": 1, **(edl.get("backdrop") or {})}, out_w, out_h, cfg), 0.1, backdrop)
+            finally:
+                r.close()
         apply_editor_defaults(edl, cfg)
         look = edl.get("look") or (cfg.get("edit") or {}).get("look")
         for n, c in enumerate(edl["clips"]):
@@ -976,11 +1090,11 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
             for k, (a, b) in enumerate(ranges):
                 seg = tmp / f"seg_{n:02d}_{k:02d}.mp4"
                 render_segment(c, a, b, seg, ratio, out_w, out_h, fps, enc, focus,
-                               timecode_from=t if proxy else None, font=font)
+                               timecode_from=t if proxy else None, font=font, backdrop=backdrop)
                 d = duration_of(seg)
                 timeline_clips.append({"src": c["src"], "src_in": round(a, 3), "src_out": round(b, 3),
                                        "at": round(t, 3), "duration": round(d, 3), "focus": [round(focus[0], 3), round(focus[1], 3)],
-                                       "zoom": c.get("zoom") or 1.0, "push": c.get("push")})
+                                       "zoom": c.get("zoom") or 1.0, "push": c.get("push"), "layout": c.get("layout") or "full"})
                 t += d
                 segments.append(seg)
         card = edl.get("end_card")
@@ -1019,7 +1133,11 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         print(f"Master (no captions): {master} ({total:.2f}s, {out_w}x{out_h}@{fps})")
 
         words = None
-        if captions_arg == "auto":
+        if captions_arg == "source":
+            words = words_from_sources(edl, timeline, batch_dir / "work" / "transcripts", cuts / f"{edl['name']}_master.words.json")
+            if words is None:
+                print("No source transcripts found in work/transcripts for the clips in this EDL; run tools/transcribe.py on the raw files first.")
+        elif captions_arg == "auto":
             words = transcribe_master(master, batch_dir / "work" / "transcripts")
             if words is None:
                 print("No transcription backend available (mlx-whisper / faster-whisper / openai-whisper). "
@@ -1138,7 +1256,8 @@ def main() -> int:
     ap.add_argument("--all-ratios", action="store_true",
                     help="render every ratio in config batch_defaults.aspect_ratios; the timeline is identical, so the "
                          "first master is transcribed once and its words are reused for the other ratios")
-    ap.add_argument("--captions", help="'auto' to transcribe the master, or a path to a words.json")
+    ap.add_argument("--captions", help="'source' to map the raw takes' transcripts through the cut (best), "
+                                       "'auto' to transcribe the master, or a path to a words.json")
     ap.add_argument("--proxy", action="store_true", help="fast 540 px rough cut with timecode, no music or graphics")
     ap.add_argument("--out-dir", help="override the output folder")
     ap.add_argument("--keep-tmp", action="store_true", help="keep intermediate files for debugging")

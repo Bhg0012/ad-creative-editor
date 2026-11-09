@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.fr { position: absolute; left: calc(var(--safe-side) + .02 * var(--W)); right: calc(var(--safe-side) + .02 * var(--W)); top: calc(var(--safe-top) + .04 * var(--H)); bottom: calc(var(--safe-bottom) + .04 * var(--H)); animation: plate-in .3s var(--ease-out) both, plate-out .25s ease-in both; animation-delay: 0s, calc(var(--dur) - .25s); }
+.c { position: absolute; width: 7%; height: 4%; border: 6px solid #fff; opacity: .95; }
+.c.tl { left: 0; top: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 10px; }
+.c.tr { right: 0; top: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 10px; }
+.c.bl { left: 0; bottom: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 10px; }
+.c.br { right: 0; bottom: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 10px; }
+.tag { position: absolute; left: 0; top: -1.6em; display: inline-flex; align-items: center; gap: .4em; font-size: {{size}}px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #fff; }
+.dot { width: .6em; height: .6em; border-radius: 50%; background: {{dot_color}}; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.time { position: absolute; right: 0; top: -1.6em; font-size: {{size}}px; font-weight: 700; letter-spacing: .06em; color: #fff; font-variant-numeric: tabular-nums; }
+</style></head><body><div class="stage">
+<div class="fr">
+  <div class="c tl"></div><div class="c tr"></div><div class="c bl"></div><div class="c br"></div>
+  <div class="tag"><span class="dot"></span>{{text}}</div>
+  <div class="time" id="tc"></div>
+</div>
+</div><script>{{harness}}
+(function(){ var el = document.getElementById('tc'); var show = {{show_time}}; var base = {{base_time}};
+  window.__tick = function(t){ if(!show){ el.textContent=''; return; } var s = base + t; var m = Math.floor(s/60), sec = Math.floor(s%60), f = Math.floor((s%1)*30);
+  el.textContent = String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+':'+String(f).padStart(2,'0'); }; window.__tick(0); })();
+</script></body></html>

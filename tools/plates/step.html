@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.step { display: inline-flex; align-items: center; gap: .45em; padding: .3em .75em .32em .6em; border-radius: 999px; font-size: {{size}}px; font-weight: 800; letter-spacing: .01em; text-transform: uppercase; white-space: nowrap; }
+.step.in.center-x { animation-name: plate-in-x; } .step.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.n { color: var(--accent); font-variant-numeric: tabular-nums; }
+</style></head><body><div class="stage">
+<div class="card step in out center-x {{variant}} {{pos}}" style="{{style}}"><span class="n">{{number}}</span><span>{{text}}</span></div>
+</div><script>{{harness}}</script></body></html>

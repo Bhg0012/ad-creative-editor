@@ -649,3 +649,173 @@ def test_caption_box_style_builds(footage):
     spec = {"type": "captions", "words": WORDS, "style": "box", "keywords": ["reviews."], "max_words": 3, "duration": 5}
     h = plates.build_html(spec, 540, 960, cfg)
     assert "style-box" in h and h.count('class="w on key"') >= 3
+
+
+def test_grid_plate_from_clip_and_new_types(footage):
+    cfg = common.load_config()
+    edl = footage / "work" / "edl" / "G_offer_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: G_offer_angle_hook_5s_9x16_v1
+hook_text: "EDITORS SHOULD BE WORRIED"
+hook_variant: light
+hook_uppercase: true
+clips:
+  - {src: raw/landscape.mp4, in: 0.0, out: 2.0}
+plates:
+  - {type: grid, src: raw/landscape.mp4, count: 6, text: "cuts found", at: 0.3, duration: 1.2}
+  - {type: step, number: "01", text: "Film it", at: 0.2, duration: 1.0}
+""")
+    loaded = render.load_edl(edl, None)
+    specs = render.plate_specs(loaded, cfg)
+    grid = next(sp for sp in specs if sp["type"] == "grid")
+    assert len(grid["images"]) == 6 and all(Path(p).exists() for p in grid["images"])
+    hook = next(sp for sp in specs if sp["type"] == "hook")
+    assert hook["uppercase"] is True and hook["variant"] == "light"
+    r = plates.Renderer(540, 960)
+    try:
+        for sp in specs:
+            r.render_still(plates.build_html(sp, 540, 960, cfg), 0.8, footage / "work" / f"still_{sp['type']}.png")
+    finally:
+        r.close()
+    from PIL import Image
+    assert Image.open(footage / "work" / "still_grid.png").size == (540, 960)
+
+
+def test_split_layout_stage_progress_punches_and_source_captions(footage):
+    """Reference 3 grammar: speaker in a bottom band over the brand backdrop, graphics on the stage above,
+    a progress bar for the whole ad, zoom punches on key words, and captions mapped from the SOURCE transcript."""
+    edl = footage / "work" / "edl" / "S_offer_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: S_offer_angle_hook_5s_9x16_v1
+progress_bar: true
+punches: [0.6, {at: 1.4}]
+clips:
+  - {src: raw/landscape.mp4, in: 1.0, out: 3.0, layout: split, tighten: 0}
+  - {src: raw/landscape.mp4, in: 5.0, out: 6.0, tighten: 0}
+plates:
+  - {type: label, text: "On the *stage*", position: stage, at: 0.3, duration: 1.2}
+  - {type: takeover, text: "*Nine*\\nreviews.", sub: "example", at: 2.2, duration: 0.6}
+""")
+    loaded = render.load_edl(edl, None)
+    specs = render.plate_specs(loaded, common.load_config())
+    stage = next(sp for sp in specs if sp["type"] == "label")
+    assert 0.25 < float(stage["position"]) < 0.40            # centre of the stage above the speaker band
+    assert specs[0]["type"] == "progress" and specs[0]["at"] == 0.0
+    final = render.render(edl, None, "source", proxy=False, keep_tmp=False, out_dir=None)
+    info = common.probe(final)
+    assert 2.8 < float(info["format"]["duration"]) < 3.3
+    # the stage (top of frame) is the dark navy backdrop while the first clip plays; the band at the bottom is A-roll
+    r, g, b = mean_rgb(final, 1.8, "crop=iw*0.6:ih*0.08:iw*0.2:ih*0.04")
+    assert r < 60 and g < 60 and b < 90 and b >= r, (r, g, b)
+    r2, g2, b2 = mean_rgb(final, 1.8, "crop=iw*0.6:ih*0.2:iw*0.2:ih*0.75")
+    assert (r2 + g2 + b2) > (r + g + b) + 60, (r2, g2, b2)
+    # second clip is full frame again
+    r3, g3, b3 = mean_rgb(final, 2.9, "crop=iw*0.6:ih*0.08:iw*0.2:ih*0.04")   # after the takeover has left
+    assert (r3 + g3 + b3) > (r + g + b) + 60, (r3, g3, b3)
+    sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
+    assert sidecar["clips"][0]["layout"] == "split" and sidecar["clips"][1]["layout"] == "full"
+    assert sidecar["punches"] == [0.6, 1.4]
+    assert [g["type"] for g in sidecar["graphics"]] == ["progress", "label", "takeover"]
+    words = json.loads(Path(sidecar["captions"]["words_json"]).read_text())
+    # source words 1.02-2.60 s ("competitor has 140 reviews.") land at 0.02-1.60 s on the master; "your" (0.85-1.00) is cut
+    assert [w["word"] for w in words] == ["competitor", "has", "140", "reviews."]
+    assert abs(words[0]["start"] - 0.02) < 0.02 and abs(words[-1]["end"] - 1.60) < 0.02
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
+    assert s["no clicks at cuts"] in ("PASS", "WARN") and s["no repeated words across cuts"] == "PASS"
+    assert "no breathy lulls over 0.5s" in s
+    assert not [k for k, v in s.items() if v == "FAIL"], s
+
+
+def test_words_from_sources_drops_removed_pauses():
+    timeline = {"clips": [{"src": "raw/landscape.mp4", "src_in": 0.0, "src_out": 1.0, "at": 0.0, "duration": 1.0},
+                          {"src": "raw/landscape.mp4", "src_in": 3.0, "src_out": 4.6, "at": 1.0, "duration": 1.6},
+                          {"src": "end_card", "at": 2.6, "duration": 1.0}]}
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        tr = Path(d) / "transcripts"
+        tr.mkdir()
+        (tr / "landscape.words.json").write_text(json.dumps(WORDS))
+        out = render.words_from_sources({}, timeline, tr, Path(d) / "m.words.json")
+        words = json.loads(out.read_text())
+    assert [w["word"] for w in words] == ["Huntsville", "roofers,", "your", "auburn", "seo", "fixes", "that."]
+    assert abs(words[3]["start"] - 1.2) < 1e-6 and words[3]["start"] > words[2]["end"]   # the 1.0-3.0 s pause is gone
+    assert render.words_from_sources({}, {"clips": [{"src": "raw/none.mp4", "src_in": 0, "src_out": 1, "at": 0, "duration": 1}]},
+                                     Path("/nonexistent"), Path("/tmp/x.json")) is None
+
+
+def test_seam_click_and_repeated_word_checks(tmp_path):
+    # a hard step from +0.9 to -0.9 at the 1.0 s cut is a butt-splice click; a continuous signal is not
+    ff("-f", "lavfi", "-i", "aevalsrc=0.9:s=48000:d=1", "-f", "lavfi", "-i", "aevalsrc=-0.9:s=48000:d=1",
+       "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1", "-c:a", "pcm_s16le", str(tmp_path / "click.wav"))
+    ff("-f", "lavfi", "-i", "aevalsrc=0.9:s=48000:d=2", "-c:a", "pcm_s16le", str(tmp_path / "smooth.wav"))
+    words = [{"word": "Huntsville", "start": 0.2, "end": 0.6}, {"word": "roofers", "start": 0.62, "end": 0.95},
+             {"word": "Roofers,", "start": 1.02, "end": 1.3}, {"word": "listen", "start": 1.32, "end": 1.6}]
+    wj = tmp_path / "w.json"
+    wj.write_text(json.dumps(words))
+    sc = {"clips": [{"src": "a", "at": 0.0}, {"src": "a", "at": 1.0}], "captions": {"words_json": str(wj)}}
+    s = {c["check"]: c for c in qa.seam_checks(tmp_path / "click.wav", sc)}
+    assert s["no clicks at cuts"]["status"] == "WARN" and "1.00s" in s["no clicks at cuts"]["detail"]
+    assert s["no repeated words across cuts"]["status"] == "FAIL" and "roofers" in s["no repeated words across cuts"]["detail"]
+    s = {c["check"]: c["status"] for c in qa.seam_checks(tmp_path / "smooth.wav", sc)}
+    assert s["no clicks at cuts"] == "PASS"
+    words[2]["word"] = "listen"
+    words[3]["word"] = "up"
+    wj.write_text(json.dumps(words))
+    s = {c["check"]: c["status"] for c in qa.seam_checks(tmp_path / "smooth.wav", sc)}
+    assert s["no repeated words across cuts"] == "PASS"
+
+
+def test_lull_scan_finds_quiet_stretch(tmp_path):
+    # speech-level tone (about -15 dB) with a breathy -41 dB stretch from 1.5 to 2.5 s: too loud for silencedetect, dead air to a viewer
+    ff("-f", "lavfi", "-i", "sine=frequency=220:sample_rate=48000:duration=4",
+       "-af", "volume='if(between(t,1.5,2.5),0.2,4)':eval=frame", "-c:a", "pcm_s16le", str(tmp_path / "lull.wav"))
+    res = {c["check"]: c for c in qa.lull_scan(tmp_path / "lull.wav")}
+    assert res["no breathy lulls over 0.5s"]["status"] == "WARN" and "(1.0s)" in res["no breathy lulls over 0.5s"]["detail"]
+    ff("-f", "lavfi", "-i", "sine=frequency=220:sample_rate=48000:duration=4", "-af", "volume=4", "-c:a", "pcm_s16le", str(tmp_path / "even.wav"))
+    res = {c["check"]: c["status"] for c in qa.lull_scan(tmp_path / "even.wav")}
+    assert res["no breathy lulls over 0.5s"] == "PASS"
+
+
+def test_speech_spans_split_takes(footage):
+    spans = transcribe.speech_spans(footage / "raw" / "portrait.mp4", min_silence=0.6)
+    assert len(spans) == 2, spans
+    assert spans[0][0] == 0.0 and abs(spans[0][1] - 1.0) < 0.15 and abs(spans[1][0] - 2.0) < 0.15 and spans[1][1] > 3.8
+
+
+def test_new_plate_types_render_stills(footage):
+    cfg = common.load_config()
+    specs = [{"type": "progress", "duration": 4.0}, {"type": "backdrop", "duration": 1.0},
+             {"type": "takeover", "text": "*Nine*\nreviews.", "sub": "example", "bg": "dark", "duration": 1.4},
+             {"type": "strike", "title": "What everyone tries", "items": ["Asking", "A sign", "Hoping"], "answer": "A text, same day", "duration": 4},
+             {"type": "pip", "src": str(footage / "raw" / "still.png"), "device": "phone", "stamp": "Live", "highlight": {"x": 0.1, "y": 0.2, "w": 0.6, "h": 0.1}, "duration": 2}]
+    assert all(plates.region_of(sp) == "full" for sp in specs[:3])
+    r = plates.Renderer(540, 960)
+    try:
+        for sp in specs:
+            r.render_still(plates.build_html(sp, 540, 960, cfg), 0.9, footage / "work" / f"still2_{sp['type']}.png")
+    finally:
+        r.close()
+    from PIL import Image
+    bd = Image.open(footage / "work" / "still2_backdrop.png").convert("RGBA")
+    assert bd.getpixel((270, 100))[3] == 255 and bd.getpixel((270, 100))[2] > bd.getpixel((270, 100))[0]   # opaque, navy
+    pr = Image.open(footage / "work" / "still2_progress.png").convert("RGBA")
+    assert pr.getpixel((270, 480))[3] == 0                        # progress plate is transparent below the bar
+    tk = Image.open(footage / "work" / "still2_takeover.png").convert("RGBA")
+    assert tk.getpixel((270, 480))[3] == 255                      # takeover covers the frame
+    h = plates.build_html(specs[4], 540, 960, cfg)
+    assert "Live" in h and 'class="hl"' in h
+
+
+def test_caption_sentiment_classes(footage):
+    cfg = common.load_config()
+    spec = {"type": "captions", "words": WORDS, "style": "pill", "keywords_neg": ["competitor"], "keywords_pos": ["fixes"], "max_words": 3, "duration": 5}
+    h = plates.build_html(spec, 540, 960, cfg)
+    assert "neg" in h and "pos" in h and h.index("competitor") < h.index("fixes")
+
+
+def test_reference_analysis_writes_report(footage):
+    import reference
+    out = reference.analyze(footage / "raw" / "landscape.mp4", 3, footage / "work" / "ref_analysis")
+    text = out.read_text()
+    assert out.suffix == ".md" and "hard cuts" in text and (footage / "work" / "ref_analysis" / "sheet.png").exists()
+    assert len(list((footage / "work" / "ref_analysis").glob("frame_*.png"))) == 3

@@ -164,3 +164,17 @@ What changed in the engine today, from those lessons:
 | References | `brand/references/` plus `brand/DESIGN.md`: screenshots of ads Bruce likes become theme and style-guide edits, never one-off styling. |
 
 Not adopted, and why: face, outfit and background swaps (trust-killing for a local founder brand, and a compliance risk); AI-generated b-roll of jobs or customers (same); DaVinci Resolve or Premiere control through MCP (the A-cut is better done from word timings with ffmpeg, which Abdaal's own test confirmed); paid sound libraries (bring one later if the synthesized defaults are not enough; the engine looks in `audio/sfx/` first).
+
+## 10. Update 2026-11-09: references 1-3 and the mrpaidsocial repo, folded into the engine
+
+Three reference ads Bruce supplied and the full `mrpaidsocial-video-editor-agent` repo were read end to end. Everything adopted is in `brand/DESIGN.md` (per reference and per repo practice, with the reasons) and in the skill reference `scripts-and-editing.md` (how to use it from an EDL). The short version:
+
+**From reference 3 (speaker band plus graphics stage):** `layout: split` on a clip, a `backdrop` plate (dark navy grid and glow), `position: stage` for cards, `progress_bar: true`, `punches: [t]` for 1.07x zoom punches, plates `takeover` and `strike`, `pip.stamp` and `pip.highlight`, red and green sentiment captions (`captions.keywords_neg/pos`), whooshes removed from default entrance sounds.
+
+**From the repo:** captions mapped from the source transcripts through the cut (`--captions source`), per-take transcription of multi-take raws (`transcribe.py --split`), seam QA (butt-splice click, repeated word across a cut), an RMS lull scan under the silence threshold, timestamp stamping in the review page, 1 s keyframe proxies for scrubbing, `tools/reference.py` to measure a reference ad as numbers, and the rule that every revision is a new EDL version.
+
+**Not adopted:** HyperFrames or Remotion as a dependency (the HTML plates render in the same headless Chromium with no Node), ElevenLabs music or voice, a web canvas editor, CapCut export, AI-generated B-roll, AVFoundation probing.
+
+**Tests:** 47 passing, including a split-layout render with stage card, takeover, progress bar, punches and source captions checked pixel by pixel, the seam and lull checks on synthesized audio, per-take speech spans, the new plates, sentiment classes and the reference analyzer.
+
+**Nothing new to install on the Mac.** `git pull origin main`, then `.venv/bin/pip install -r requirements.txt` (no new packages, but harmless). Playwright and its Chromium were already installed for the plates; `tools/doctor.py` confirms.

@@ -141,9 +141,53 @@ def run_backend(backend: str, audio, model: str, prompt: str) -> dict:
     raise SystemExit(f"unknown backend {backend}")
 
 
-def transcribe_file(path: str | Path, out: Path, backend: str, model: str | None, prompt: str) -> list[dict]:
+def speech_spans(path: str | Path, min_silence: float = 0.8, noise_db: float = -38.0) -> list[tuple[float, float]]:
+    """Speech regions separated by pauses of at least `min_silence` seconds (the take boundaries in a multi-take raw)."""
+    res = subprocess.run([ffmpeg(), "-nostdin", "-v", "info", "-i", str(path), "-vn", "-af", f"silencedetect=n={noise_db}dB:d={min_silence}",
+                          "-f", "null", "-"], capture_output=True, text=True)
+    import re as _re
+
+    starts = [float(x) for x in _re.findall(r"silence_start: (-?[\d.]+)", res.stderr)]
+    ends = [float(x) for x in _re.findall(r"silence_end: (-?[\d.]+)", res.stderr)]
+    dur_m = _re.search(r"Duration: (\d+):(\d+):([\d.]+)", res.stderr)
+    total = (int(dur_m.group(1)) * 3600 + int(dur_m.group(2)) * 60 + float(dur_m.group(3))) if dur_m else 0.0
+    spans, cur = [], 0.0
+    for s_, e_ in zip(starts, ends):
+        if s_ - cur > 0.3:
+            spans.append((cur, s_))
+        cur = e_
+    if total - cur > 0.3:
+        spans.append((cur, total))
+    return spans
+
+
+def transcribe_file(path: str | Path, out: Path, backend: str, model: str | None, prompt: str, split: bool = False) -> list[dict]:
     out.mkdir(parents=True, exist_ok=True)
-    result = run_backend(backend, load_audio(path), model or DEFAULT_MODELS[backend], prompt)
+    if split:
+        # Multi-take raws: whisper on continuous audio merges back-to-back retakes into one phrase and hides
+        # the stumble. Transcribing each pause-separated take on its own keeps every attempt visible.
+        import numpy as np
+
+        audio = load_audio(path)
+        segs, text_parts = [], []
+        for a, b in speech_spans(path):
+            piece = audio[int(a * SAMPLE_RATE): int(b * SAMPLE_RATE)]
+            if len(piece) < SAMPLE_RATE * 0.3:
+                continue
+            r = run_backend(backend, piece, model or DEFAULT_MODELS[backend], prompt)
+            for seg in r.get("segments", []):
+                seg["start"] = float(seg["start"]) + a
+                seg["end"] = float(seg["end"]) + a
+                for w in seg.get("words", []) or []:
+                    if w.get("start") is not None:
+                        w["start"] = float(w["start"]) + a
+                    if w.get("end") is not None:
+                        w["end"] = float(w["end"]) + a
+                segs.append(seg)
+            text_parts.append(str(r.get("text", "")).strip())
+        result = {"text": " ".join(text_parts), "segments": segs}
+    else:
+        result = run_backend(backend, load_audio(path), model or DEFAULT_MODELS[backend], prompt)
     stem = Path(path).stem
     words = normalize(result)
     (out / f"{stem}.words.json").write_text(json.dumps(words, indent=1))
@@ -161,6 +205,7 @@ def main() -> int:
     ap.add_argument("--backend", default="auto", choices=("auto", *BACKENDS))
     ap.add_argument("--model", help=f"backend model id; defaults: {DEFAULT_MODELS}")
     ap.add_argument("--prompt", default=DEFAULT_PROMPT, help="spelling/context hint for names")
+    ap.add_argument("--split", action="store_true", help="transcribe each pause-separated take on its own (multi-take raws)")
     args = ap.parse_args()
 
     backend = pick_backend(args.backend)
@@ -170,7 +215,7 @@ def main() -> int:
               "Lightweight (any platform): .venv/bin/pip install faster-whisper")
         return 1
     for f in args.files:
-        transcribe_file(f, Path(args.out), backend, args.model, args.prompt)
+        transcribe_file(f, Path(args.out), backend, args.model, args.prompt, split=args.split)
     return 0
 
 

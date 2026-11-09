@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.wrap { position: absolute; left: var(--safe-side); right: var(--safe-side); text-align: center; }
+.grid { display: grid; grid-template-columns: repeat({{cols}}, 1fr); gap: 10px; }
+.cell { position: relative; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); animation: cell-in .35s var(--spring) both; background: #111; aspect-ratio: 9 / 16; }
+.cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cell .tag { position: absolute; top: 6px; left: 6px; font-size: calc({{size}}px * .28); font-weight: 800; letter-spacing: .04em; padding: .1em .4em; border-radius: 6px; background: rgba(15,17,21,.85); color: #fff; text-transform: uppercase; }
+@keyframes cell-in { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+.head { margin-top: .5em; font-size: {{size}}px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); animation: plate-in .4s var(--spring) both; animation-delay: {{head_delay}}s; }
+.head .n { color: var(--accent); }
+.out-all { animation: plate-out .25s ease-in both; animation-delay: calc(var(--dur) - .25s); }
+</style></head><body><div class="stage">
+<div class="wrap out-all {{pos}}">
+  <div class="grid">{{cells_html}}</div>
+  <div class="head"><span class="n">{{count}}</span> {{text}}</div>
+</div>
+</div><script>{{harness}}</script></body></html>

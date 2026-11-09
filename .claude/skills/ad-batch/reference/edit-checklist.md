@@ -14,12 +14,16 @@ What a trained editor checks by reflex. The tools catch most of it; this is the 
 - [ ] No pause longer than about 0.4 s inside a sentence (use `tighten`); no clipped breaths (keep 0.12 s).
 - [ ] A visual change every 2-4 s in the first 10 s; B-roll shows exactly what the voice says at that moment.
 - [ ] No B-roll or picture-in-picture covers the speaker's face during the hook or the CTA.
+- [ ] QA seam checks clean: no click at a cut, no repeated word across a cut (a surviving retake), no breathy lull over 0.5 s. Fix in the EDL (`tighten`, move the cut, cover with a card), never by hand.
+- [ ] Punches (if any) land on the stressed word, at most 3-5 per 30 s.
 
 ## Text and graphics
 - [ ] Every text element sits inside the safe zone (QA geometry) and is readable at 360 px wide.
 - [ ] Captions never overlap the lower third, a callout, or the hook text. Timing of the lower third moved if needed.
 - [ ] Caption spelling: brand name, city names and trade words correct (`captions.fixes`), numbers labeled "(example)" unless real.
 - [ ] Callouts appear when the word is spoken, not before.
+- [ ] Split sections: the speaker band and the stage never swap mid-idea; every stage card is `position: stage`; back to full frame for the CTA.
+- [ ] Captions came from the source transcripts (`--captions source`), not a re-transcribed cut; sentiment colours only on words that earn them.
 - [ ] End card: exact action ("Tap Learn More"), local identifier if relevant, 2-3 s, brand colors, logo if available.
 
 ## Sound
@@ -38,3 +42,5 @@ What a trained editor checks by reflex. The tools catch most of it; this is the 
 - [ ] Proxy or final watched end to end once at phone size.
 - [ ] `exports/<ad>.render.json` matches the EDL (nothing silently skipped).
 - [ ] Notes from the previous gate are all applied and logged in `LEARNINGS.md`.
+- [ ] Every revision is a new EDL version (`_v2`, `_v3`), never an overwrite; the review page notes carry timestamps ("Stamp time").
+- [ ] For every note from the gate, write the evidence row: note, time, which EDL key changed, which rule in the skill should have prevented it.

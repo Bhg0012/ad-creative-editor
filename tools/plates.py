@@ -39,9 +39,13 @@ TEMPLATES = Path(__file__).resolve().parent / "plates"
 SIZES = {  # font size as a fraction of frame height
     "label": 0.046, "stat": 0.11, "compare": 0.044, "card": 0.042, "pip": 0.03,
     "lower_third": 0.034, "hook": 0.046, "endcard": 0.056, "captions": 0.044,
+    "step": 0.04, "grid": 0.05, "before_after": 0.08, "chips": 0.042, "frame_label": 0.026,
+    "takeover": 0.14, "strike": 0.046, "progress": 0.0, "backdrop": 0.0,
 }
-ENTRANCE_SFX = {"label": "pop", "stat": "ding", "compare": "whoosh", "card": "pop", "pip": "whoosh",
-                "lower_third": "click", "hook": None, "endcard": "riser", "captions": None}
+ENTRANCE_SFX = {"label": "pop", "stat": "ding", "compare": "pop", "card": "pop", "pip": "pop",
+                "lower_third": "click", "hook": None, "endcard": "riser", "captions": None,
+                "step": "click", "grid": "pop", "before_after": "thud", "chips": "click", "frame_label": "click",
+                "takeover": "thud", "strike": "pop", "progress": None, "backdrop": None}
 REGION = {"top": "top", "center": "center", "lower": "lower"}
 
 
@@ -117,11 +121,11 @@ def fill(name: str, values: dict) -> str:
 def region_of(spec: dict) -> str:
     """Where the plate sits, for QA (face overlap) and the sidecar."""
     kind = spec["type"]
-    if kind in ("hook",):
+    if kind in ("hook", "step"):
         return "top"
     if kind in ("lower_third", "captions"):
         return "lower"
-    if kind in ("endcard",):
+    if kind in ("endcard", "frame_label", "takeover", "progress", "backdrop"):
         return "full"
     pos = str(spec.get("position") or "center")
     return pos if pos in REGION else "center"
@@ -146,12 +150,87 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
     variant = str(spec.get("variant") or ("accent" if spec.get("accent") else "dark"))
     pos, style = pos_class(spec)
     if kind == "label":
+        text = str(spec.get("text", ""))
+        if variant == "boxes":
+            words = []
+            for i, w in enumerate(text.split()):
+                acc = w.startswith("*") and w.endswith("*") and len(w) > 2
+                words.append(f'<span class="bw{" acc" if acc else ""}" style="animation-delay:{0.06 * i:.2f}s">{esc(w.strip("*"))}</span>')
+            body = "".join(words)
+        else:
+            body = emph(text)
         return fill("label", {"theme": th, "size": size, "variant": variant, "pos": pos, "style": style,
-                              "text": esc(spec.get("text", "")), "emoji": esc(spec.get("emoji", ""))})
+                              "text": body, "emoji": esc(spec.get("emoji", ""))})
     if kind == "stat":
+        thumbs = spec.get("thumbs") or []
+        thumbs_html = ('<div class="thumbs">' + "".join(f'<img src="{data_uri(t)}" style="animation-delay:{0.3 + 0.12 * i:.2f}s">'
+                                                        for i, t in enumerate(thumbs[:4])) + "</div>") if thumbs else ""
+        value = float(spec.get("value") or 0)
         return fill("stat", {"theme": th, "size": size, "variant": variant, "pos": pos, "style": style,
-                             "value": int(spec.get("value") or 0), "prefix": esc(spec.get("prefix", "")),
-                             "suffix": esc(spec.get("suffix", "")), "label": esc(spec.get("label", ""))})
+                             "value": value, "decimals": 1 if value != int(value) else 0, "prefix": esc(spec.get("prefix", "")),
+                             "suffix": esc(spec.get("suffix", "")), "label": esc(spec.get("label", "")), "thumbs_html": thumbs_html})
+    if kind == "step":
+        return fill("step", {"theme": th, "size": size, "variant": variant, "pos": pos or "pos-top", "style": style,
+                             "number": esc(spec.get("number", "")), "text": esc(spec.get("text", ""))})
+    if kind == "grid":
+        images = list(spec.get("images") or [])
+        cols = int(spec.get("cols") or min(6, max(3, round(len(images) ** 0.5 * 1.3))))
+        cells = "".join(f'<div class="cell" style="animation-delay:{0.08 * i:.2f}s"><img src="{data_uri(im)}"><span class="tag">{esc(spec.get("tag", "cut"))} {i + 1}</span></div>'
+                        for i, im in enumerate(images))
+        return fill("grid", {"theme": th, "size": size, "pos": pos or "pos-center", "cols": cols, "cells_html": cells,
+                             "count": esc(spec.get("count", len(images))), "text": esc(spec.get("text", "")),
+                             "head_delay": f"{0.08 * len(images) + 0.1:.2f}"})
+    if kind == "before_after":
+        import random
+
+        rnd = random.Random(7)
+        bars = "".join(f'<i style="height:{rnd.randint(18, 100)}%;animation-delay:{0.15 + 0.012 * i:.3f}s"></i>' for i in range(42))
+        good = spec.get("good", "to")   # which side is the improvement; colors the "to" value
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        accent = colors.get("accent", "#E55B13")
+        return fill("before_after", {"theme": th, "size": size, "variant": variant, "pos": pos, "style": style,
+                                     "label": esc(spec.get("label", "")), "from": esc(spec.get("from", "")), "to": esc(spec.get("to", "")),
+                                     "sub": esc(spec.get("sub", "")), "bars_html": bars,
+                                     "tag_color": "#d12d3a" if spec.get("bad") else accent,
+                                     "wave_color": "#2fd27a" if good == "to" else accent, "to_color": "#2fd27a" if good == "to" else accent})
+    if kind == "chips":
+        items = spec.get("items") or []
+        cols = int(spec.get("cols") or min(3, len(items)) or 1)
+        chips = []
+        for i, it in enumerate(items[:9]):
+            if isinstance(it, dict):
+                b, sm = it.get("text", ""), it.get("sub", "")
+            else:
+                b, sm = str(it), ""
+            chips.append(f'<div class="chip" style="animation-delay:{0.25 + 0.12 * i:.2f}s"><b>{esc(b)}</b>' + (f"<small>{esc(sm)}</small>" if sm else "") + "</div>")
+        return fill("chips", {"theme": th, "size": size, "variant": variant, "pos": pos, "style": style, "cols": cols,
+                              "title": emph(spec.get("title", "")).replace("<em>", '<span class="acc">').replace("</em>", "</span>"),
+                              "chips_html": "".join(chips)})
+    if kind == "takeover":
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        bg = {"dark": "#0f1115", "primary": colors.get("primary", "#3B96F6"), "accent": colors.get("accent", "#E55B13"),
+              "light": "#f5f5f7"}.get(str(spec.get("bg") or "dark"), str(spec.get("bg")))
+        color = "#0f1115" if str(spec.get("bg")) == "light" else "#ffffff"
+        return fill("takeover", {"theme": th, "size": size, "bg": bg, "color": color, "text": emph(spec.get("text", "")),
+                                 "sub": esc(spec.get("sub", ""))})
+    if kind == "strike":
+        items = [str(x) for x in (spec.get("items") or [])][:5]
+        rows = "".join(f'<div class="row dead" style="animation-delay:{0.2 + 0.3 * i:.2f}s">{esc(x)}<i style="animation-delay:{0.2 + 0.3 * len(items) + 0.22 * i:.2f}s"></i></div>'
+                       for i, x in enumerate(items))
+        return fill("strike", {"theme": th, "size": size, "variant": variant, "pos": pos, "style": style,
+                               "title": esc(spec.get("title", "")), "rows_html": rows, "answer": esc(spec.get("answer", "")),
+                               "answer_delay": f"{0.2 + 0.3 * len(items) + 0.22 * len(items) + 0.25:.2f}"})
+    if kind == "progress":
+        return fill("progress", {"theme": th})
+    if kind == "backdrop":
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        return fill("backdrop", {"theme": th, "bg": str(spec.get("bg") or "#0b1020"), "bg2": str(spec.get("bg2") or "#141c33"),
+                                 "glow": colors.get("primary", "#3B96F6")})
+    if kind == "frame_label":
+        return fill("frame_label", {"theme": th, "size": size, "text": esc(spec.get("text", "raw footage")),
+                                    "dot_color": "#ff3b30" if spec.get("rec", True) else "#2fd27a",
+                                    "show_time": "true" if spec.get("timecode", True) else "false",
+                                    "base_time": float(spec.get("timecode_from") or 0.0)})
     if kind == "compare":
         left, right = spec.get("left") or {}, spec.get("right") or {}
         lv, rv = float(left.get("value") or 0), float(right.get("value") or 0)
@@ -182,13 +261,22 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
         top = max(safe_box(width, height, ratio_of(width, height) or "9:16")["top"], top)
         caption = spec.get("caption")
         cap_html = (f'<div class="cap dark" style="top:{top + frame_h}px">{esc(caption)}</div>' if caption else "")
+        stamp_html = f'<div class="stamp">{esc(spec["stamp"])}</div>' if spec.get("stamp") else ""
+        hl = spec.get("highlight")   # fractions of the image: {x, y, w, h}
+        hl_vals = {"hl_html": "", "hl_x": 0, "hl_y": 0, "hl_w": 0, "hl_h": 0}
+        if hl:
+            hl_vals = {"hl_html": '<div class="hl"></div>', "hl_x": round(frame_w * float(hl.get("x", 0.05))),
+                       "hl_y": round(frame_w * ih / iw * float(hl.get("y", 0.4))), "hl_w": round(frame_w * float(hl.get("w", 0.9))),
+                       "hl_h": round(frame_w * ih / iw * float(hl.get("h", 0.06)))}
         return fill("pip", {"theme": th, "size": size, "frame_w": frame_w, "frame_radius": 36, "device": device,
-                            "src": data_uri(src), "top": top, "zoom": float(spec.get("zoom") or 1.06),
-                            "origin": str(spec.get("origin") or "50% 40%"), "caption_html": cap_html})
+                            "src": data_uri(src), "top": top, "zoom": float(spec.get("zoom") or (1.0 if spec.get("highlight") else 1.06)),
+                            "origin": str(spec.get("origin") or "50% 40%"), "caption_html": cap_html, "stamp_html": stamp_html,
+                            "stamp_top": top + frame_h // 2, **hl_vals})
     if kind == "lower_third":
         return fill("lower_third", {"theme": th, "size": size, "text": esc(spec.get("text", "")), "sub": esc(spec.get("sub", ""))})
     if kind == "hook":
-        return fill("hook", {"theme": th, "size": size, "variant": variant, "text": emph(spec.get("text", ""))})
+        return fill("hook", {"theme": th, "size": size, "variant": variant, "text": emph(spec.get("text", "")),
+                             "uc": "uc" if spec.get("uppercase") else ""})
     if kind == "endcard":
         logo = ROOT / "brand" / "logo.png"
         logo_html = f'<img class="logo" src="{data_uri(logo)}">' if (spec.get("logo", True) and logo.exists()) else ""
@@ -206,6 +294,9 @@ def captions_html(spec: dict, th: str, size: int) -> str:
     words = spec["words"]
     style = str(spec.get("style") or "pill")
     keywords = {k.lower() for k in (spec.get("keywords") or [])}
+    neg = {k.lower() for k in (spec.get("keywords_neg") or [])}   # costs, pain: red
+    pos = {k.lower() for k in (spec.get("keywords_pos") or [])}   # wins, outcomes: green
+    keywords |= neg | pos
     chunks = cap.chunk(words, int(spec.get("max_words") or 4))
     pages = []
     for n, c in enumerate(chunks):
@@ -218,6 +309,9 @@ def captions_html(spec: dict, th: str, size: int) -> str:
             w_start = w["start"] if i else start
             w_end = c[i + 1]["start"] if i + 1 < len(c) else end
             cls = "w on" + (" key" if i == k else "")
+            if i == k:
+                plain = re.sub(r"[^\w$%']", "", w["word"]).lower()
+                cls += " neg" if plain in neg else (" pos" if plain in pos else "")
             spans.append(f'<span class="{cls}" style="animation-delay:{w_start:.3f}s;--wlen:{max(0.05, w_end - w_start):.3f}s">{esc(w["word"])}</span>')
         pages.append(f'<div class="page" style="animation-delay:{start:.3f}s;--len:{max(0.05, end - start):.3f}s">'
                      f'<div class="inner" style="animation-delay:{start:.3f}s">{" ".join(spans)}</div></div>')
@@ -297,6 +391,14 @@ def demo_specs() -> list[dict]:
         {"type": "card", "title": "You get", "items": ["Review requests sent for you", "Replies written for you", "Monthly report by text"], "duration": 3},
         {"type": "lower_third", "text": "Bruce", "sub": "AuburnSEO, Auburn AL", "duration": 3},
         {"type": "endcard", "headline": "More reviews.\nMore calls.", "text": "Tap Learn More", "subtext": "Huntsville contractors", "duration": 2.5},
+        {"type": "step", "number": "03", "text": "Give it a style", "duration": 2.5},
+        {"type": "label", "text": "THE *MOTION* GRAPHICS", "variant": "boxes", "position": "lower", "duration": 2},
+        {"type": "before_after", "label": "Dead space", "bad": True, "from": "12.5s", "to": "4.9s", "sub": "pauses removed", "duration": 2.5},
+        {"type": "chips", "title": "Sound *effects*", "items": [{"text": "Pop", "sub": "pop.wav"}, {"text": "Click", "sub": "click.wav"}, {"text": "Thud", "sub": "thud.wav"},
+                                                               {"text": "Ding", "sub": "ding.wav"}, {"text": "Swipe", "sub": "swipe.wav"}, {"text": "Sub", "sub": "sub.wav"}], "duration": 3},
+        {"type": "frame_label", "text": "Raw footage", "timecode_from": 12.0, "duration": 2.5},
+        {"type": "takeover", "text": "*Nine*\nreviews.", "sub": "example", "bg": "dark", "duration": 1.4},
+        {"type": "strike", "title": "What everyone tries", "items": ["Asking in person", "A sign at the counter", "Hoping"], "answer": "A text, the same day", "duration": 4},
     ]
 
 
