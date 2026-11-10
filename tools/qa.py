@@ -286,7 +286,8 @@ def sidecar_checks(sidecar: dict, duration: float) -> list[dict]:
                 clashes.append(f"{a['type']}@{a['at']}s and {b['type']}@{b['at']}s")
     res.append(check("one graphic per region at a time", "PASS" if not clashes else "FAIL",
                      "ok" if not clashes else "overlapping: " + "; ".join(clashes[:4])))
-    short = [g for g in sidecar.get("graphics", []) if g["type"] in ("label", "stat", "compare", "card", "callout") and g["duration"] < 1.4]
+    short = [g for g in sidecar.get("graphics", []) if (g["type"] in ("label", "stat", "compare", "card", "callout", "toast", "words") and g["duration"] < 1.4)
+             or (g["type"] == "takeover" and g["duration"] < 0.6)]
     res.append(check("graphics stay up long enough to read", "PASS" if not short else "WARN",
                      "ok" if not short else f"{len(short)} graphics under 1.4 s"))
     hook = next((g for g in sidecar.get("graphics", []) if g["type"] in ("hook_text", "hook") and g["at"] == 0.0), None)

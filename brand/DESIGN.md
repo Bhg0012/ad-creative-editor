@@ -135,3 +135,47 @@ Deliberately not adopted: HyperFrames or Remotion as a dependency (our HTML plat
 same headless Chromium with zero Node), ElevenLabs music and voice (bring licensed audio, the engine
 ducks it), a web canvas editor, CapCut export, AI-generated B-roll (compliance and the "no inkling this
 is AI" brief), AVFoundation probing (ffprobe does it everywhere).
+
+## Reference 4 (2026-11-10): "cute, fun, modern" creator ad, 70 s, 9:16
+
+Measured with `tools/reference.py`: 70 s, 13 hard cuts (two camera framings alternate, full body and
+medium), 0.41 visual changes per second, voice only with no music bed, true peak +1.8 dBTP (clipped;
+do not copy that). The feeling Bruce liked comes from six things, none of them the subject matter:
+
+What it does:
+- **Hook title, no box:** three stacked lines on the footage in white with a soft shadow: a small
+  kicker ("Building a"), the big line ("Fake Money Manager"), a medium sub line ("with Grok Bot").
+  Up for the first 3 s while the one-word captions sit low over the chest.
+- **One word per caption page**, sentence case, white, heavy rounded sans, soft shadow, no box, no
+  outline. After the hook the caption moves up to about 36% of the frame, above the speaker's head,
+  so the words and the floating graphics share the open air and nothing ever sits on the face.
+- **Floating cutouts:** 3D clay-style characters and objects (an eraser with scissors, a green
+  triangle, a cube, a ball) float above her head with no card, no frame, a soft shadow and a slow
+  bob. Illustrated image cards (square, no radius) do the same for scenes.
+- **Cream paper takeovers:** a full-frame or top-half cream sheet with a dotted grid and heavy deep
+  maroon type. Words land one at a time at different sizes ("because we're gonna be using"), a small
+  logo chip arrives last. A book-cover parody ("AI Agents for Dummies") uses the same sheet.
+- **Small white notice card** ("Your subscription has been cancelled.") under an image card.
+- **Giant word over the footage** ("GROK") with the caption word under it for the CTA.
+- **Grade:** dim room, warm practical lights, strong colour on the speaker (red cardigan on a dark
+  set), warm pastel palette on every graphic. The warmth and the pastels are the "cute".
+
+Adopted (all from the EDL, see `scripts-and-editing.md`):
+- `hook_variant: clean` with `hook_kicker` and `hook_sub` lines.
+- `caption_style: word` and `caption_position: high` (captions stay low while the hook card is up,
+  then move above the head).
+- `pip: {style: cutout, float: true}` for transparent PNGs; `pip: {radius: 0}` for square image cards.
+  `tools/cutout.py` makes a transparent PNG from any photo or render (rembg, free, local).
+- Plate `words` (one word at a time at its own size, on `paper`, `dark` or `none`, optional `chip`),
+  plate `toast` (white notice card with a title and dot), `takeover` with `bg: paper` or `bg: none`,
+  `backdrop: {style: paper}` for a cream top half in `layout: split`.
+- `look: {temperature: 5200, vignette: 0.35}` for the warm dim-room grade.
+
+Where the characters come from: the engine floats any transparent PNG. Bruce supplies them once
+(an illustrator, a licensed 3D or AI render with a commercial licence, or a photo of a real thing
+cut out with `tools/cutout.py`: the truck, the phone, a review card, a tool). For AuburnSEO the
+honest version of "cute" is real objects from the trade (a drill, a hard hat, a work van, a phone
+showing a review) floating as cutouts, not a mascot pretending to be a product.
+
+Not adopted: voice-only sound (keep the low music bed), the clipped peak, 4-6 s cards (ours are
+2-3 s in a 30-45 s ad), text-only captions moving around the frame per word.

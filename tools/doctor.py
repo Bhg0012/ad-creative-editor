@@ -35,6 +35,7 @@ PY_PACKAGES = [
     ("librosa", "librosa", False),
     ("auto_editor", "auto-editor", False),
     ("jupyter", "jupyter", False),
+    ("rembg", "rembg", False),
 ]
 TRANSCRIBERS = ["mlx_whisper", "whisperx", "faster_whisper", "whisper"]
 

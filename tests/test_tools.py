@@ -819,3 +819,57 @@ def test_reference_analysis_writes_report(footage):
     text = out.read_text()
     assert out.suffix == ".md" and "hard cuts" in text and (footage / "work" / "ref_analysis" / "sheet.png").exists()
     assert len(list((footage / "work" / "ref_analysis").glob("frame_*.png"))) == 3
+
+
+def test_reference4_look_renders(footage):
+    """Reference 4 grammar: boxless stacked hook, one-word captions above the head, a floating cutout mascot,
+    a cream paper words card, a toast notice, a giant word over the footage, and a warm vignetted grade."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGBA", (500, 600), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((40, 40, 460, 560), radius=120, fill=(232, 96, 120, 255))
+    im.save(footage / "raw" / "mascot.png")
+    edl = footage / "work" / "edl" / "R4_offer_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: R4_offer_angle_hook_5s_9x16_v1
+hook_kicker: "Building a"
+hook_text: "Review machine"
+hook_sub: "for Huntsville roofers"
+hook_variant: clean
+hook_text_seconds: 1.0
+caption_style: word
+caption_position: high
+look: {temperature: 5200, vignette: 0.35}
+clips:
+  - {src: raw/landscape.mp4, in: 1.0, out: 3.0, tighten: 0}
+  - {src: raw/landscape.mp4, in: 5.0, out: 6.0, tighten: 0}
+broll:
+  - {src: raw/mascot.png, at: 1.1, duration: 0.8, pip: {style: cutout, float: true, w: 0.34, y: 0.2, zoom: 1.0}}
+plates:
+  - {type: toast, title: "Review request", text: "Sent (example).", position: "0.30", at: 1.9, duration: 0.25}
+  - {type: words, words: ["without", "*writing*", "code"], chip: "AuburnSEO", at: 2.2, duration: 0.55}
+  - {type: takeover, text: "NINE", sub: "reviews", bg: none, at: 2.75, duration: 0.25}
+""")
+    specs = render.plate_specs(render.load_edl(edl, None), common.load_config())
+    hook = next(sp for sp in specs if sp["type"] == "hook")
+    assert hook["kicker"] == "Building a" and hook["sub"] == "for Huntsville roofers" and hook["variant"] == "clean"
+    assert "temperature=5200" in render.look_filter({"temperature": 5200, "vignette": 0.35}) and "vignette=" in render.look_filter({"vignette": True})
+    final = render.render(edl, None, "source", proxy=False, keep_tmp=False, out_dir=None)
+    sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
+    assert sidecar["captions"]["style"] == "word"
+    pages = json.loads(Path(sidecar["captions"]["pages"]).read_text())
+    assert pages and all(len(p["text"].split()) == 1 for p in pages)      # one word per page
+    # the first page (during the hook) is low, later pages are high
+    import plates as pl_
+    h = pl_.build_html({"type": "captions", "words": WORDS, "style": "word", "position": "high", "hook_until": 1.0, "duration": 5}, 540, 960, common.load_config())
+    assert h.count('<div class="cap') == 2 and h.index('style-word  high') > h.index('Huntsville')
+    assert sidecar["broll"][0]["pip"] is True and sidecar["broll"][0]["engine"] == "html"
+    assert [g["type"] for g in sidecar["graphics"]] == ["hook", "pip", "toast", "words", "takeover"]
+    # the mascot cutout floats above the head: pink pixels in the top fifth of the frame at 1.5 s, no card behind it
+    r, g, b = mean_rgb(final, 1.5, "crop=iw*0.12:ih*0.06:iw*0.44:ih*0.18")
+    assert r > 150 and r > g + 60 and r > b + 40, (r, g, b)
+    # the words card at 2.4 s is cream paper across the whole frame
+    r, g, b = mean_rgb(final, 2.4, "crop=iw*0.6:ih*0.1:iw*0.2:ih*0.75")
+    assert r > 200 and g > 195 and b > 185 and r >= b, (r, g, b)
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
+    assert not [k for k, v in s.items() if v == "FAIL"], s

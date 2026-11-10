@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+.stage { background: {{bg}}; }
+.dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(60,40,30,.28) 1.6px, transparent 1.8px); background-size: 44px 44px; background-position: 22px 22px; }
+/* words land one at a time, each at its own size, like someone typing a thought (reference 4: "because we're gonna be using") */
+.flow { position: absolute; left: calc(var(--safe-side) + .06 * var(--W)); right: calc(var(--safe-side) + .06 * var(--W)); top: 40%; transform: translateY(-50%); text-align: center; line-height: 1.05; color: {{color}}; font-weight: 800; letter-spacing: -0.02em; }
+.wd { display: inline-block; margin: .04em .12em; font-size: {{size}}px; opacity: 0; animation: wd-in .3s var(--spring) both; animation-fill-mode: forwards; }
+.wd em { font-style: normal; color: var(--accent); }
+@keyframes wd-in { from { opacity: 0; transform: translateY(14px) scale(.8); } to { opacity: 1; transform: none; } }
+.chip { position: absolute; left: 50%; top: 40%; margin-top: calc({{size}}px * 1.1); transform: translateX(-50%); display: inline-flex; align-items: center; gap: .45em; font-size: calc({{size}}px * .34); font-weight: 700; color: {{color}}; opacity: 0; animation: wd-in .3s var(--spring) both; animation-fill-mode: forwards; animation-delay: {{chip_delay}}s; }
+.chip .dot { width: .9em; height: .9em; border-radius: 50%; background: {{color}}; box-shadow: inset -.2em -.2em .3em rgba(255,255,255,.35); }
+.stage.out-all { animation: plate-out .22s ease-in both; animation-delay: calc(var(--dur) - .22s); }
+</style></head><body><div class="stage out-all">{{dots_html}}<div class="flow">{{words_html}}</div>{{chip_html}}</div><script>{{harness}}</script></body></html>

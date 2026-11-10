@@ -1,8 +1,10 @@
 <!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
 body { background: {{bg}}; }
+/* paper: cream dotted-grid sheet (reference 4) */
+.dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(60,40,30,.28) 1.6px, transparent 1.8px); background-size: 44px 44px; background-position: 22px 22px; }
 .word { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); font-size: {{size}}px; font-weight: 800; letter-spacing: -0.03em; line-height: .95; text-align: center; color: {{color}}; white-space: pre-wrap; animation: take-in .34s var(--spring) both, take-out .22s ease-in both; animation-delay: 0s, calc(var(--dur) - .22s); }
 @keyframes take-in  { from { opacity: 0; transform: translate(-50%, -50%) scale(.82); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes take-out { from { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -50%) scale(1.04); } }
 .word em { font-style: normal; color: var(--accent); }
 .sub { position: absolute; left: 50%; top: 46%; margin-top: calc({{size}}px * .62); transform: translateX(-50%); font-size: calc({{size}}px * .22); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: {{color}}; opacity: .8; animation: plate-in .4s var(--spring) both; animation-delay: .18s; }
-</style></head><body><div class="stage"><div class="word">{{text}}</div><div class="sub">{{sub}}</div></div><script>{{harness}}</script></body></html>
+</style></head><body><div class="stage">{{dots_html}}<div class="word">{{text}}</div><div class="sub">{{sub}}</div></div><script>{{harness}}</script></body></html>
