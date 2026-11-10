@@ -14,7 +14,9 @@ Plate types:
     lower_third  name tag sliding in from the left
     hook         headline on frame 1 (instant on, animated off)
     endcard      brand background, logo pop, headline, pulsing CTA button, subtext
-    captions     word-timed captions: pill (spoken word in an accent pill), highlight, clean
+    captions     word-timed captions: pill (spoken word in an accent pill), highlight, clean, box, word
+    words        words landing one at a time at their own sizes, on paper / dark / nothing (reference 4)
+    toast        small white notice card with an optional title and dot
 
 Usage:
     .venv/bin/python tools/plates.py render spec.yaml --size 1080x1920 --out plate.mov
@@ -40,13 +42,15 @@ SIZES = {  # font size as a fraction of frame height
     "label": 0.046, "stat": 0.11, "compare": 0.044, "card": 0.042, "pip": 0.03,
     "lower_third": 0.034, "hook": 0.046, "endcard": 0.056, "captions": 0.044,
     "step": 0.04, "grid": 0.05, "before_after": 0.08, "chips": 0.042, "frame_label": 0.026,
-    "takeover": 0.14, "strike": 0.046, "progress": 0.0, "backdrop": 0.0,
+    "takeover": 0.14, "strike": 0.046, "progress": 0.0, "backdrop": 0.0, "words": 0.075, "toast": 0.03,
 }
 ENTRANCE_SFX = {"label": "pop", "stat": "ding", "compare": "pop", "card": "pop", "pip": "pop",
                 "lower_third": "click", "hook": None, "endcard": "riser", "captions": None,
                 "step": "click", "grid": "pop", "before_after": "thud", "chips": "click", "frame_label": "click",
-                "takeover": "thud", "strike": "pop", "progress": None, "backdrop": None}
+                "takeover": "thud", "strike": "pop", "progress": None, "backdrop": None, "words": "click", "toast": "pop"}
 REGION = {"top": "top", "center": "center", "lower": "lower"}
+PAPER_BG = "#f3f0ea"    # cream dotted-grid sheet (reference 4)
+PAPER_INK = "#4a1c1c"   # the deep maroon type on it
 
 
 def chromium_path() -> str | None:
@@ -125,7 +129,7 @@ def region_of(spec: dict) -> str:
         return "top"
     if kind in ("lower_third", "captions"):
         return "lower"
-    if kind in ("endcard", "frame_label", "takeover", "progress", "backdrop"):
+    if kind in ("endcard", "frame_label", "takeover", "progress", "backdrop", "words"):
         return "full"
     pos = str(spec.get("position") or "center")
     return pos if pos in REGION else "center"
@@ -208,11 +212,12 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
                               "chips_html": "".join(chips)})
     if kind == "takeover":
         colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        bg_key = str(spec.get("bg") or "dark")
         bg = {"dark": "#0f1115", "primary": colors.get("primary", "#3B96F6"), "accent": colors.get("accent", "#E55B13"),
-              "light": "#f5f5f7"}.get(str(spec.get("bg") or "dark"), str(spec.get("bg")))
-        color = "#0f1115" if str(spec.get("bg")) == "light" else "#ffffff"
+              "light": "#f5f5f7", "paper": PAPER_BG, "none": "transparent"}.get(bg_key, bg_key)
+        color = str(spec.get("color") or {"light": "#0f1115", "paper": PAPER_INK}.get(bg_key, "#ffffff"))
         return fill("takeover", {"theme": th, "size": size, "bg": bg, "color": color, "text": emph(spec.get("text", "")),
-                                 "sub": esc(spec.get("sub", ""))})
+                                 "sub": esc(spec.get("sub", "")), "dots_html": '<div class="dots"></div>' if bg_key == "paper" else ""})
     if kind == "strike":
         items = [str(x) for x in (spec.get("items") or [])][:5]
         rows = "".join(f'<div class="row dead" style="animation-delay:{0.2 + 0.3 * i:.2f}s">{esc(x)}<i style="animation-delay:{0.2 + 0.3 * len(items) + 0.22 * i:.2f}s"></i></div>'
@@ -224,8 +229,34 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
         return fill("progress", {"theme": th})
     if kind == "backdrop":
         colors = (cfg.get("business") or {}).get("brand_colors") or {}
-        return fill("backdrop", {"theme": th, "bg": str(spec.get("bg") or "#0b1020"), "bg2": str(spec.get("bg2") or "#141c33"),
-                                 "glow": colors.get("primary", "#3B96F6")})
+        style = str(spec.get("style") or "navy")
+        bg, bg2 = ("#0b1020", "#141c33") if style != "paper" else (PAPER_BG, PAPER_BG)
+        return fill("backdrop", {"theme": th, "bg": str(spec.get("bg") or bg), "bg2": str(spec.get("bg2") or bg2),
+                                 "glow": colors.get("primary", "#3B96F6"), "style": style})
+    if kind == "words":
+        # Words land one at a time over the first 70% of the plate, each at its own size, like a thought being typed.
+        words = [str(w) for w in (spec.get("words") or str(spec.get("text", "")).split())][:12]
+        n = max(1, len(words))
+        window = duration * 0.7 if not spec.get("step") else float(spec["step"]) * n
+        scales = [1.0, 1.45, 0.85, 1.25, 1.0, 1.6, 0.9, 1.3]
+        parts = []
+        for i, w in enumerate(words):
+            delay = (window / n) * i
+            parts.append(f'<span class="wd" style="font-size:{round(size * scales[i % len(scales)])}px;animation-delay:{delay:.3f}s">{emph(w)}</span>')
+        bg_key = str(spec.get("bg") or "paper")
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        bg = {"paper": PAPER_BG, "dark": "#0f1115", "none": "transparent", "primary": colors.get("primary", "#3B96F6")}.get(bg_key, bg_key)
+        color = str(spec.get("color") or {"paper": PAPER_INK, "dark": "#ffffff", "none": "#ffffff"}.get(bg_key, "#ffffff"))
+        chip = spec.get("chip")
+        chip_html = f'<div class="chip"><span class="dot"></span>{esc(chip)}</div>' if chip else ""
+        return fill("words", {"theme": th, "size": size, "bg": bg, "color": color, "words_html": " ".join(parts), "chip_html": chip_html,
+                              "chip_delay": f"{window + 0.1:.3f}", "dots_html": '<div class="dots"></div>' if bg_key == "paper" else ""})
+    if kind == "toast":
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        title = spec.get("title")
+        title_html = f'<div class="title"><span class="dot"></span>{esc(title)}</div>' if title else ""
+        return fill("toast", {"theme": th, "size": size, "pos": pos or "pos-center", "style": style, "title_html": title_html,
+                              "text": esc(spec.get("text", "")), "dot": str(spec.get("dot") or colors.get("accent", "#E55B13"))})
     if kind == "frame_label":
         return fill("frame_label", {"theme": th, "size": size, "text": esc(spec.get("text", "raw footage")),
                                     "dot_color": "#ff3b30" if spec.get("rec", True) else "#2fd27a",
@@ -252,7 +283,7 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
         src = Path(spec["src"]).resolve()
         with Image.open(src) as im:
             iw, ih = im.size
-        device = "phone" if spec.get("device") == "phone" else ""
+        device = "phone" if spec.get("device") == "phone" else ("cutout" if str(spec.get("style") or "") == "cutout" else "")
         frac = float(spec.get("w") or (0.58 if device else 0.78))
         frame_w = round(width * frac)
         frame_h = round(frame_w * ih / iw) + (28 if device else 0)
@@ -268,15 +299,19 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
             hl_vals = {"hl_html": '<div class="hl"></div>', "hl_x": round(frame_w * float(hl.get("x", 0.05))),
                        "hl_y": round(frame_w * ih / iw * float(hl.get("y", 0.4))), "hl_w": round(frame_w * float(hl.get("w", 0.9))),
                        "hl_h": round(frame_w * ih / iw * float(hl.get("h", 0.06)))}
-        return fill("pip", {"theme": th, "size": size, "frame_w": frame_w, "frame_radius": 36, "device": device,
+        radius = spec.get("radius")
+        return fill("pip", {"theme": th, "size": size, "frame_w": frame_w, "frame_radius": 36 if radius is None else int(radius), "device": device,
+                            "float": "float" if spec.get("float") else "",
                             "src": data_uri(src), "top": top, "zoom": float(spec.get("zoom") or (1.0 if spec.get("highlight") else 1.06)),
                             "origin": str(spec.get("origin") or "50% 40%"), "caption_html": cap_html, "stamp_html": stamp_html,
                             "stamp_top": top + frame_h // 2, **hl_vals})
     if kind == "lower_third":
         return fill("lower_third", {"theme": th, "size": size, "text": esc(spec.get("text", "")), "sub": esc(spec.get("sub", ""))})
     if kind == "hook":
+        kicker = f'<span class="kicker">{esc(spec["kicker"])}</span>' if spec.get("kicker") else ""
+        sub = f'<span class="sub">{esc(spec["sub"])}</span>' if spec.get("sub") else ""
         return fill("hook", {"theme": th, "size": size, "variant": variant, "text": emph(spec.get("text", "")),
-                             "uc": "uc" if spec.get("uppercase") else ""})
+                             "uc": "uc" if spec.get("uppercase") else "", "kicker_html": kicker, "sub_html": sub})
     if kind == "endcard":
         logo = ROOT / "brand" / "logo.png"
         logo_html = f'<img class="logo" src="{data_uri(logo)}">' if (spec.get("logo", True) and logo.exists()) else ""
@@ -297,11 +332,13 @@ def captions_html(spec: dict, th: str, size: int) -> str:
     neg = {k.lower() for k in (spec.get("keywords_neg") or [])}   # costs, pain: red
     pos = {k.lower() for k in (spec.get("keywords_pos") or [])}   # wins, outcomes: green
     keywords |= neg | pos
-    chunks = cap.chunk(words, int(spec.get("max_words") or 4))
+    chunks = cap.chunk(words, 1 if style == "word" else int(spec.get("max_words") or 4))
     pages = []
     for n, c in enumerate(chunks):
         start, end = c[0]["start"], cap.page_end(chunks, n)
         k = cap.pick_keyword(c, keywords) if style != "pill" else None
+        if style == "word" and c and re.sub(r"[^\w$%']", "", c[0]["word"]).lower() not in keywords:
+            k = None   # one word per page: colour it only when it is a listed keyword
         if style == "box" and k is None and c:
             k = max(range(len(c)), key=lambda i: len(c[i]["word"]))   # box style always marks one word
         spans = []
@@ -315,8 +352,17 @@ def captions_html(spec: dict, th: str, size: int) -> str:
             spans.append(f'<span class="{cls}" style="animation-delay:{w_start:.3f}s;--wlen:{max(0.05, w_end - w_start):.3f}s">{esc(w["word"])}</span>')
         pages.append(f'<div class="page" style="animation-delay:{start:.3f}s;--len:{max(0.05, end - start):.3f}s">'
                      f'<div class="inner" style="animation-delay:{start:.3f}s">{" ".join(spans)}</div></div>')
+    high = str(spec.get("position") or "lower") == "high"
+    hook_until = float(spec.get("hook_until") or 0.0)
+    pages_html = "\n".join(pages)
+    if high and hook_until > 0 and chunks:
+        # While the hook card is up the captions stay low (the hook owns the top); they move above the head after it leaves.
+        n_low = sum(1 for c in chunks if c[0]["start"] < hook_until)
+        pages_html = ("\n".join(pages[:n_low]) + f'\n</div><div class="cap style-{style} {"uc" if spec.get("uppercase") else ""} high">\n'
+                      + "\n".join(pages[n_low:]))
+        high = False
     return fill("captions", {"theme": th, "size": size, "style": style, "uc": "uc" if spec.get("uppercase") else "",
-                             "pages_html": "\n".join(pages)})
+                             "position": "high" if high else "", "pages_html": pages_html})
 
 
 class Renderer:
@@ -399,6 +445,9 @@ def demo_specs() -> list[dict]:
         {"type": "frame_label", "text": "Raw footage", "timecode_from": 12.0, "duration": 2.5},
         {"type": "takeover", "text": "*Nine*\nreviews.", "sub": "example", "bg": "dark", "duration": 1.4},
         {"type": "strike", "title": "What everyone tries", "items": ["Asking in person", "A sign at the counter", "Hoping"], "answer": "A text, the same day", "duration": 4},
+        {"type": "words", "words": ["because", "we're", "gonna", "*text*", "them"], "chip": "AuburnSEO", "duration": 2.4},
+        {"type": "toast", "title": "Review request", "text": "Sent to 14 customers (example).", "position": "0.30", "duration": 2},
+        {"type": "hook", "kicker": "Building a", "text": "Review machine", "sub": "for Huntsville roofers", "variant": "clean", "duration": 3},
     ]
 
 

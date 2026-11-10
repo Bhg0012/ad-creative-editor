@@ -42,7 +42,7 @@ Every ad is described by `work/edl/<adname>.yaml` (print a template with `tools/
 | `progress_bar: true` | Thin brand-gradient bar across the top for the whole ad. |
 | `punches: [9.4, 15.2]` | Quick 1.07x zoom punches on these key-word times (in over 0.15 s, back over 0.35 s). Finals only; proxies skip them. |
 | `caption_keywords_neg`, `caption_keywords_pos` | Words shown red (pain, cost) or green (wins) in the captions, on top of `captions.keywords_neg/pos` in `config.yaml`. |
-| `look` | Optional light grade for A-roll: `contrast`, `brightness`, `saturation`, `gamma`, `sharpen`. Keep it subtle (1.03-1.08); phone footage is already contrasty. |
+| `look` | Optional light grade for A-roll: `contrast`, `brightness`, `saturation`, `gamma`, `sharpen`, `temperature` (kelvin, 5200 warms a dim room), `vignette` (0-1). Keep it subtle (1.03-1.08); phone footage is already contrasty. |
 | `hook_text`, `hook_text_seconds` | Headline from frame 1, inside the top safe zone, with a dark box. Max about 7 words. |
 | `lower_third` | `text`, `at`, `duration`: name + "Auburn, AL" in the accent color, above the caption band. |
 | `music` | `src`, `gain_db` (default -18), `duck: true` (sidechain under the voice), `fade_out`. Loops if shorter than the ad. |
@@ -94,6 +94,14 @@ Every graphic is a motion plate: an HTML template in `tools/plates/` filled from
 | `broll[]` still with `pip.stamp` and `pip.highlight: {x, y, w, h}` | a corner stamp ("LIVE", "RAW") and a highlighted band over the line that matters | screenshots where one line is the point |
 | `position: stage` on any plate | centred in the open stage above a `layout: split` speaker | every card in the split section |
 | `hook_variant: light`, `hook_uppercase: true` | white box, black ALL CAPS headline | the creator-ad hook look (reference 2) |
+| `hook_variant: clean` with `hook_kicker`, `hook_sub` | no box: small kicker, big line, medium sub line in white with a soft shadow on the footage | the "cute, modern" creator look (reference 4) |
+| `caption_style: word`, `caption_position: high` | one word per page, soft shadow, no box; the band moves above the head once the hook card leaves | reference 4; pair with floating cutouts |
+| `broll[]` still with `pip: {style: cutout, float: true}` | a transparent PNG floating with a soft shadow and slow bob, no frame | characters, objects, products, a cut-out of a real thing (`tools/cutout.py`) |
+| `broll[]` still with `pip: {radius: 0}` | square image card, no rounding | illustrated scenes (reference 4) |
+| `plates[] type: words` | `words` land one at a time at their own sizes; `bg: paper` (cream dotted sheet, maroon type), `dark` or `none`; `chip` label last | a thought being typed, the setup line before the mechanism |
+| `plates[] type: toast` | small white notice card: `title` with a dot, `text`; `position` | "review request sent", "appointment booked" moments (generic, never a copy of a real app) |
+| `plates[] type: takeover` with `bg: paper` or `bg: none` | giant word on the cream sheet, or straight on the footage | one-word turns, the brand word at the CTA |
+| `backdrop: {style: paper}` (EDL root) | cream dotted sheet instead of navy for `layout: split` | the light, friendly version of the split layout |
 | `broll[]` still with `pip` | rounded, shadowed inset with slow zoom; `pip.device: phone` adds a bezel; `label` becomes a caption | screenshots, review cards, photos |
 | `broll[]` video with `pip` | rounded, shadowed video inset | a phone screen recording over the speaker |
 | `broll[]` with `speaker_inset: {w, x, y}` | the B-roll fills the frame and the speaker stays in a rounded corner inset (from the A-roll, lip sync untouched) | "the screen is the set": a screen recording or dashboard while the mechanism is explained (`brand/DESIGN.md`, reference 1) |

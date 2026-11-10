@@ -71,7 +71,7 @@ def edl_example() -> str:
 name: HSV_reviews_lostjobs_question_30s_9x16_v1
 ratio: "9:16"                 # 9:16 Reels/Stories, 4:5 Feed. Override with --ratio.
 hook_text: "Huntsville roofers: 9 reviews?"   # on screen from frame 1, max ~7 words; *word* turns accent
-hook_variant: dark            # dark | light (white box, black text)  hook_uppercase: true for ALL CAPS
+hook_variant: dark            # dark | light (white box, black text) | clean (no box, soft shadow; add hook_kicker and hook_sub lines)  hook_uppercase: true for ALL CAPS
 hook_text_seconds: 3
 progress_bar: true            # thin brand-gradient bar across the top for the whole ad (retention device)
 punches: [9.4, 15.2]          # quick 1.07x zoom punches on these key words
@@ -100,7 +100,7 @@ plates:                       # richer motion graphics (tools/plates.py): stat, 
   - {type: label, text: "THE *MOTION* GRAPHICS", variant: boxes, position: lower, at: 22.0, duration: 2.0}
   - {type: card, title: "You get", items: ["Review requests sent for you", "Replies written for you", "Monthly report by text"], at: 24.0, duration: 3.5}
 lower_third: {text: "Bruce, Auburn AL", at: 1.0, duration: 3.0}
-look: {contrast: 1.04, saturation: 1.08, sharpen: true}   # optional light grade on A-roll only
+look: {contrast: 1.04, saturation: 1.08, sharpen: true}   # optional light grade on A-roll only; add temperature: 5200 (warm) and vignette: 0.35 for the dim evening-room look
 music: {src: audio/music/track.mp3, gain_db: -18, duck: true, fade_out: 1.0}
 sfx:
   - {src: audio/sfx/whoosh.wav, at: 6.0, gain_db: -12}
@@ -339,6 +339,13 @@ def look_filter(look: dict | None) -> str | None:
             eq.append(f"{key}={float(look[key])}")
     if eq:
         parts.append("eq=" + ":".join(eq))
+    if look.get("temperature"):
+        # kelvin; below 6500 warms the image (the dim, warm "evening apartment" look of reference 4 is about 5200)
+        parts.append(f"colortemperature=temperature={int(look['temperature'])}:mix=0.85")
+    if look.get("vignette"):
+        v = look["vignette"]
+        strength = 0.35 if v is True else max(0.05, min(1.0, float(v)))
+        parts.append(f"vignette=angle=PI/{4 + 6 * (1 - strength):.2f}:mode=forward")
     if look.get("sharpen"):
         parts.append("unsharp=5:5:0.6:5:5:0.0")
     return ",".join(parts) or None
@@ -567,7 +574,8 @@ def plate_specs(edl: dict, cfg: dict) -> list[dict]:
     if edl.get("hook_text"):
         specs.append({"type": "hook", "text": str(edl["hook_text"]), "at": 0.0,
                       "duration": float(edl.get("hook_text_seconds") or DEFAULTS["hook_text_seconds"]),
-                      "variant": str(edl.get("hook_variant") or "dark"), "uppercase": bool(edl.get("hook_uppercase"))})
+                      "variant": str(edl.get("hook_variant") or "dark"), "uppercase": bool(edl.get("hook_uppercase")),
+                      "kicker": edl.get("hook_kicker"), "sub": edl.get("hook_sub")})
     lt = edl.get("lower_third")
     if lt and lt.get("text"):
         text, sub = str(lt["text"]), str(lt.get("sub") or "")
@@ -582,7 +590,8 @@ def plate_specs(edl: dict, cfg: dict) -> list[dict]:
         if b.get("pip") and b.get("still") and b.get("_html_pip"):
             pip = b["pip"]
             specs.append({"type": "pip", "src": str(b["path"]), "at": float(b["at"]), "duration": float(b["duration"]),
-                          "w": pip.get("w"), "y": pip.get("y"), "device": pip.get("device"), "zoom": pip.get("zoom"), "caption": b.get("label")})
+                          "w": pip.get("w"), "y": pip.get("y"), "device": pip.get("device"), "zoom": pip.get("zoom"), "caption": b.get("label"),
+                          **{k: pip[k] for k in ("stamp", "highlight", "style", "float", "radius", "origin") if k in pip}})
     for pl in edl.get("plates") or []:
         sp = dict(pl)
         sp.setdefault("duration", 2.5)
@@ -924,7 +933,7 @@ def build_captions(words_json: Path, out_w: int, out_h: int, ass_out: Path, cfg:
 
 
 ASS_STYLES = {"chunk", "highlight", "karaoke", "reveal", "hormozi"}
-HTML_STYLES = {"pill", "highlight", "clean", "box"}
+HTML_STYLES = {"pill", "highlight", "clean", "box", "word"}
 
 
 def build_caption_plate(words_json: Path, out_w: int, out_h: int, total: float, fps: int, out: Path, cfg: dict, edl: dict) -> list[dict]:
@@ -941,8 +950,9 @@ def build_caption_plate(words_json: Path, out_w: int, out_h: int, total: float, 
     spec = {"type": "captions", "words": words, "style": style, "keywords": keywords,
             "keywords_neg": list(c.get("keywords_neg") or []) + list(edl.get("caption_keywords_neg") or []),
             "keywords_pos": list(c.get("keywords_pos") or []) + list(edl.get("caption_keywords_pos") or []),
-            "max_words": max(2, min(5, int(c.get("words_per_chunk_max") or 4))), "uppercase": bool(c.get("uppercase")),
-            "duration": total}
+            "max_words": 1 if style == "word" else max(2, min(5, int(c.get("words_per_chunk_max") or 4))), "uppercase": bool(c.get("uppercase")),
+            "position": str(edl.get("caption_position") or c.get("position") or "lower"), "duration": total,
+            "hook_until": float(edl.get("hook_text_seconds") or DEFAULTS["hook_text_seconds"]) if edl.get("hook_text") else 0.0}
     r = pl.Renderer(out_w, out_h)
     try:
         r.render_mov(pl.build_html(spec, out_w, out_h, cfg), total, fps, out)

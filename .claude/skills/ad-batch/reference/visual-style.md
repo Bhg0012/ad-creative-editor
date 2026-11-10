@@ -44,6 +44,15 @@ AI edits drift toward "busy and generic". These rules pull every ad toward one c
 - Card archetypes, one per idea: `label` for a line, `stat` for a number, `compare` for you vs them, `card` for a list, `step` for the sequence, `takeover` for the one number or word that is the ad, `strike` for what they tried before, `before_after` for a change, `grid` for "look how many", `pip` with `stamp` and `highlight` for a screenshot where one line matters. Pick by the idea, not by what looks cool.
 - Punches (`punches`) on at most 3-5 key words per 30 s, on the stressed syllable. Not on every sentence.
 
+## The light look (when the batch wants "cute, fun, modern" instead of dark cards)
+
+One look per batch still holds; this is the second look available, from reference 4 in `brand/DESIGN.md`.
+- Hook: `hook_variant: clean` with a kicker and a sub line, no box.
+- Captions: `caption_style: word`, `caption_position: high`. One word, soft shadow, above the head after the hook.
+- Graphics: floating cutouts (`pip: {style: cutout, float: true}`) of real objects from the trade, square image cards, `words` on cream paper, `toast` for a notice, `takeover` with `bg: none` for the one word at the CTA.
+- Grade: `look: {temperature: 5200, vignette: 0.35}` on dim indoor footage; skip it outdoors.
+- Still one graphic per idea, still 2-3 s each, still a low music bed. The cute comes from warmth, pastels and the bob, not from more things on screen.
+
 ## Sound
 
 - Voice first, always intelligible with music muted. Music is a bed, 18 to 22 dB under the voice before ducking, ducked a further 10 to 15 dB while speaking.

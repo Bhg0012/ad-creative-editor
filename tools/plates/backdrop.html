@@ -1,5 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
 body { background: radial-gradient(120% 70% at 50% 18%, {{bg2}} 0%, {{bg}} 60%, {{bg}} 100%); }
 .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px); background-size: 90px 90px; }
+.paper .grid { background-image: radial-gradient(rgba(60,40,30,.26) 1.6px, transparent 1.8px); background-size: 44px 44px; background-position: 22px 22px; }
+.paper .glow { display: none; }
 .glow { position: absolute; left: 50%; top: 22%; width: 70%; height: 36%; transform: translateX(-50%); background: radial-gradient(closest-side, {{glow}} 0%, transparent 70%); opacity: .35; }
-</style></head><body><div class="stage"><div class="grid"></div><div class="glow"></div></div><script>{{harness}}</script></body></html>
+</style></head><body><div class="stage {{style}}"><div class="grid"></div><div class="glow"></div></div><script>{{harness}}</script></body></html>

@@ -6,3 +6,5 @@ ref2 (Instagram, "Claude edited this whole video", 98 s): white-box ALL CAPS hoo
 dark cards with one orange: step pills, big counters with commas, thumbnail grids, before/after with waveform, word-box labels, chip grids, REC brackets.
 ref3 ("Claude Code edited this entire video", 82 s): speaker in a bottom band, dark navy grid stage above him for every graphic;
 numbered cards, wireframe diagrams, one giant word takeovers, struck-through lists, progress bar on top, one-word captions in red/green, 1.07x punches, no whooshes.
+ref4 (creator ad, 70 s): boxless three-line hook, one-word captions that move above the head, floating 3D cutouts with no card,
+cream dotted-paper takeovers with words landing one at a time, white notice card, giant word over the footage, warm dim grade. Voice only.

@@ -25,6 +25,14 @@
 .style-box .w.on { animation: none; }
 .style-box .w.key { color: #fff; background: var(--accent); border-radius: .12em; padding: 0 .18em; -webkit-text-stroke: 0; text-shadow: none; }
 .uc { text-transform: uppercase; }
-</style></head><body><div class="stage"><div class="cap style-{{style}} {{uc}}">
+/* word: one word per page, larger, soft shadow only, a spring pop per word (reference 4). */
+.style-word .page { font-size: calc({{size}}px * 1.35); font-weight: 800; letter-spacing: -0.02em; text-shadow: 0 3px 4px rgba(0,0,0,.5), 0 0 24px rgba(0,0,0,.35); }
+.style-word .page .inner { animation: word-pop .26s var(--spring) both; animation-fill-mode: none; }
+@keyframes word-pop { from { transform: scale(.86); opacity: .5; } to { transform: scale(1); opacity: 1; } }
+.style-word .w.on { animation: none; } .style-word .w { padding: 0; }
+/* high: the caption band sits above the speaker's head (about 36% of the frame) instead of over the chest */
+.cap.high { bottom: auto; top: 36%; }
+.cap.high .page { bottom: auto; top: 0; }
+</style></head><body><div class="stage"><div class="cap style-{{style}} {{uc}} {{position}}">
 {{pages_html}}
 </div></div><script>{{harness}}</script></body></html>
