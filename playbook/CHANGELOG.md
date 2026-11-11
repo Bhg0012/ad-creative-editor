@@ -26,3 +26,6 @@ Verified all facts in `facts.yaml` against live sources. Corrections to the orig
 - **"Max 20% budget change"** is practitioner lore, not a Meta rule.
 - **New rules:** audit Advantage+ creative enhancements before publishing, disclose AI content, use Meta Sound Collection or ad-licensed music only, and send CRM lead-quality signals back to Meta (Conversion Leads).
 - **Mac tooling:** Homebrew's `ffmpeg` formula was slimmed in January 2026 and no longer includes libass/freetype, so captions and drawtext fail. Use `ffmpeg-full` instead (handled by `tools/setup_mac.sh`).
+
+## 2026-11-11
+- `reels_safe_zone`: re-checked against current secondary guides (14/35/6 unchanged). Added the 40% bottom rule for ads with a disclaimer and the Ads Manager safe zone guardrail preview as the final check. Noted Bruce's audience is about 95% mobile Reels.
