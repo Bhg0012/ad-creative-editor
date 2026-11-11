@@ -28,7 +28,12 @@ facts:
     notes: >
       One third-party source (Billo, 2026) says Meta unified Stories and Reels into one 9:16
       safe zone in March 2026. Meta's Reels page still shows 14/35/6, which is the stricter
-      set, so design to it.
+      set, so design to it. Re-checked 2026-11-11 against several secondary guides: all still
+      cite 14/35/6. Two extras worth knowing: ads that carry a disclaimer need the bottom 40%
+      clear (not 35%), and Ads Manager has a "Safe zone guardrail" toggle in the media step
+      that previews the yellow overlay on the actual creative; use it as the final check.
+      Bruce's audience is about 95% mobile, Facebook and Instagram Reels, so this zone is
+      the rule for every ad, not a suggestion.
 
   - id: reels_video_specs
     topic: specs
