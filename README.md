@@ -56,6 +56,8 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/plates.py` | Motion plates: browser-rendered graphics (hook card, callouts, stat, compare, card, step, grid, before/after, chips, frame label, takeover, strike, progress bar, backdrop, words, toast, fan, steps, timer, quote, files, tracks, phone and browser frames, pip, lower third, end card, word-by-word captions) from one design system in `tools/plates/` |
 | `tools/capture.py` | Screenshots or scroll-through videos of web pages (your site, a Google Business Profile) as B-roll |
 | `tools/pipeline.py` | The assembly line: one command runs inventory, transcription, storyboard, render, source captions, other ratios, QA, copy lint and the review page in order with a ticked checklist |
+| `tools/takes.py` | Every take in a raw recording as its own file, named by what was said; or just the clips one EDL uses (for hand editing later) |
+| `tools/deliver.py` | Sorts finished ads into `deliver/<market>/<offer>/<ratio>/` with a MANIFEST.csv for uploading to Meta |
 | `tools/cutout.py` | Transparent PNG cutouts from photos or renders (rembg, optional) for floating graphics |
 | `tools/reference.py` | Measure a reference ad (cuts, change events per second by hook/body/CTA, loudness, music bed, contact sheet, frames) into a `.analysis.md` so its style can be copied as numbers |
 | `tools/sfx.py` | Synthesized default sound effects (pop, click, whoosh, ding, riser) until licensed ones are in `audio/sfx/` |

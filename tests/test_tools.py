@@ -978,3 +978,30 @@ end_card: {text: "Tap Learn More", seconds: 1.0}
     assert "every take already transcribed" in rc.stdout and "[x]  6. Captions" in rc.stdout and "from the source transcripts" in rc.stdout
     assert (footage / "exports" / "P_offer_angle_hook_5s_9x16_v1.mp4").exists() and (footage / "review" / "index.html").exists()
     assert (footage / "qa" / "REPORT.md").exists()
+
+
+def test_takes_export_and_deliver_folders(footage):
+    import takes
+    import deliver
+    out = footage / "work" / "takes"
+    files = takes.export_takes(footage / "raw" / "portrait.mp4", out, None, min_silence=0.6)
+    assert len(files) == 2 and all(f.exists() for f in files) and "take01_00m00s" in files[0].name
+    d1 = float(common.probe(files[0])["format"]["duration"])
+    assert 0.9 < d1 < 1.5, d1
+    files = takes.export_takes(footage / "raw" / "landscape.mp4", out, footage / "work" / "transcripts", min_silence=0.5)
+    assert files and "huntsville-roofers" in files[0].name
+    edl = footage / "work" / "edl" / "P_offer_angle_hook_5s_9x16_v1.yaml"
+    if edl.exists():
+        clips = takes.export_edl_clips(edl, out / "P")
+        assert len(clips) == 1 and clips[0].name.startswith("P_offer_angle_hook_5s_9x16_v1_clip01_landscape")
+    assert deliver.parse_name("HSV_reviews_lostjobs_question_30s_9x16_v1") == {"market": "HSV", "offer": "reviews", "angle": "lostjobs", "hooktype": "question", "length": "30", "ratio": "9x16", "version": "1"}
+    assert deliver.parse_name("not_a_name") is None
+    (footage / "exports").mkdir(exist_ok=True)
+    import shutil
+    shutil.copy2(footage / "raw" / "portrait.mp4", footage / "exports" / "TEST_offer_angle_question_10s_9x16_v9.mp4")
+    (footage / "exports" / "not_a_name.mp4").write_bytes(b"")
+    rows = deliver.deliver(footage, "market")
+    assert rows and all((footage / r["file"]).exists() for r in rows) and all(r["name"] != "not_a_name" for r in rows)
+    assert (footage / "deliver" / "MANIFEST.csv").exists()
+    assert any(r["ratio"] == "9x16" and r["market"] == "TEST" for r in rows)
+    assert all(str(Path(r["file"]).parts[1]) == r["market"] for r in rows)
