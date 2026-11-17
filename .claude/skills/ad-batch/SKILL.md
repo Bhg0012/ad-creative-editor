@@ -109,7 +109,7 @@ Size the batch to the budget: each live ad needs enough spend to be judged (see 
 
 ## Stage 6: full edit
 
-Follow `reference/visual-style.md` for the look and `reference/scripts-and-editing.md` for cadence, captions, graphics, sound, and render settings. The render is three commands per ad:
+Follow `reference/visual-style.md` for the look and `reference/scripts-and-editing.md` for cadence, captions, graphics, sound, and render settings. The whole edit is one command per ad: `.venv/bin/python tools/pipeline.py work/edl/<adname>.yaml` (add `--proxy` for the rough cut only, `--all-ratios` for every ratio). It runs the steps below in order and prints a ticked checklist; use the individual commands when one step needs attention:
 
 1. `.venv/bin/python tools/render.py work/edl/<adname>.yaml` renders `work/cuts/<adname>_master.mp4` (reframed, graded, B-roll, hook text, lower third, music ducked under the voice, SFX, two-pass loudness) with no captions yet.
 2. Captions come from the SOURCE transcripts, never from re-transcribing the cut: `.venv/bin/python tools/render.py work/edl/<adname>.yaml --captions source` maps each take's word timings through the clip map (exact timing; a surviving retake shows up in QA as a repeated word). Only when a raw file has no transcript, fall back to `--captions auto` (transcribes the master) or `--captions work/transcripts/<adname>_master.words.json`.
@@ -117,7 +117,7 @@ Follow `reference/visual-style.md` for the look and `reference/scripts-and-editi
 
 Key points:
 - Graphics are motion plates (`reference/scripts-and-editing.md`, "Motion plates"): the hook card, callouts, lower third, stat, compare, card, pip and the end card are rendered in a browser with real easing from one design system, and every entrance gets a sound effect. Flat text is only the fallback when Chromium is missing.
-- Framing grammar: the hook and the CTA are full frame (the face sells). For the mechanism and proof section put `layout: split` on those clips: the speaker holds the bottom band over the brand backdrop and every card gets `position: stage` above him, so nothing ever sits on the face. Add `progress_bar: true` and 3-5 `punches` on the stressed words of a 30 s ad. Pick the card archetype by the idea (`reference/visual-style.md`, "Card archetypes").
+- Framing grammar: the hook and the CTA are full frame (the face sells). Three looks are available (`reference/visual-style.md`): house dark cards, the light look (clean hook, one-word captions, floating cutouts, paper cards), the studio look (`split: {style: panel}`, captions in the seam, fan, steps, timer, tracks on the stage). One look per batch. For the mechanism and proof section put `layout: split` on those clips: the speaker holds the bottom band over the brand backdrop and every card gets `position: stage` above him, so nothing ever sits on the face. Add `progress_bar: true` and 3-5 `punches` on the stressed words of a 30 s ad. Pick the card archetype by the idea (`reference/visual-style.md`, "Card archetypes").
 - Pattern interrupt every 2-4s in the first 10s (alternate `zoom: 1.0` and `zoom: 1.08-1.12`, B-roll, text); B-roll shows what the VO says; face on screen in hook and CTA.
 - Captions are generated from a transcript of the final master, never retyped. Default style `chunk` for this ICP; make one variant per batch in `hormozi` or `highlight` style and let the data decide.
 - Every text element inside the safe zone for its ratio (render.py places them there; QA still checks).

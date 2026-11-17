@@ -274,7 +274,7 @@ def script_check_pages(pages_json: Path, script_path: Path) -> list[dict]:
     return [check("captions match script", status, "all lines heard" if not missing else "not heard: " + " | ".join(m[:50] for m in missing[:5]))]
 
 
-def sidecar_checks(sidecar: dict, duration: float) -> list[dict]:
+def sidecar_checks(sidecar: dict, duration: float, ratio: str | None = None) -> list[dict]:
     res = []
     # Two graphics fighting for the same region at the same time is the fastest way to look machine-made.
     gs = [g for g in sidecar.get("graphics", []) if g.get("region") in ("center", "top")]
@@ -293,8 +293,11 @@ def sidecar_checks(sidecar: dict, duration: float) -> list[dict]:
     hook = next((g for g in sidecar.get("graphics", []) if g["type"] in ("hook_text", "hook") and g["at"] == 0.0), None)
     res.append(check("headline on frame 1", "PASS" if hook else "WARN",
                      f'"{hook.get("text", "")}" for {hook["duration"]}s' if hook else "no hook_text in the EDL; the text hook must be on screen from frame 1"))
-    res.append(check("duration for all placements", "PASS" if duration <= MAX_SECONDS_ALL_PLACEMENTS else "WARN",
-                     f"{duration:.1f}s (keep under {MAX_SECONDS_ALL_PLACEMENTS}s so every placement is eligible)"))
+    if ratio == "16:9":
+        res.append(check("duration for all placements", "PASS", f"{duration:.1f}s long-form 16:9; the 60 s placement rule does not apply"))
+    else:
+        res.append(check("duration for all placements", "PASS" if duration <= MAX_SECONDS_ALL_PLACEMENTS else "WARN",
+                         f"{duration:.1f}s (keep under {MAX_SECONDS_ALL_PLACEMENTS}s so every placement is eligible)"))
     if not any(c.get("src") == "end_card" for c in sidecar.get("clips", [])):
         res.append(check("end card with CTA", "WARN", "no end_card in the EDL; the last 2-3 s should state the exact action"))
     else:
@@ -523,7 +526,7 @@ def qa_one(path: Path, qa_dir: Path, target: float, tp_max: float, script: Path 
     results += black_and_silence(path)
     sidecar = load_sidecar(path)
     if sidecar:
-        results += sidecar_checks(sidecar, meta["duration"])
+        results += sidecar_checks(sidecar, meta["duration"], meta.get("ratio"))
         caps = sidecar.get("captions") or {}
         ass = Path(caps["ass"]) if caps.get("ass") else None
         pages_json = Path(caps["pages"]) if caps.get("pages") else None

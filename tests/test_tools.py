@@ -873,3 +873,108 @@ plates:
     assert r > 200 and g > 195 and b > 185 and r >= b, (r, g, b)
     s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
     assert not [k for k, v in s.items() if v == "FAIL"], s
+
+
+def test_reference5_panel_bezel_mid_captions(footage):
+    """Reference 5 grammar: speaker in a rounded glowing panel over the navy stage, a phone frame around a video inset,
+    captions in the seam, a card fan and a self-completing checklist on the stage."""
+    edl = footage / "work" / "edl" / "R5_offer_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: R5_offer_angle_hook_5s_9x16_v1
+caption_style: word
+caption_position: mid
+split: {style: panel, margin: 0.05}
+clips:
+  - {src: raw/landscape.mp4, in: 1.0, out: 3.0, layout: split, tighten: 0}
+  - {src: raw/landscape.mp4, in: 5.0, out: 6.0, tighten: 0}
+broll:
+  - {src: raw/broll.mp4, at: 2.1, duration: 0.8, src_in: 0.5, pip: {w: 0.34, x: 0.5, y: 0.25, device: phone}}
+plates:
+  - {type: fan, cards: [{text: "Request sent", badge: "day 1"}, {text: "Reply posted", badge: "day 2"}, {text: "5 stars", badge: "day 3"}], at: 0.2, duration: 0.9}
+  - {type: steps, items: ["Job done", "Text goes out", "Review lands"], at: 1.15, duration: 0.8}
+""")
+    final = render.render(edl, None, "source", proxy=False, keep_tmp=False, out_dir=None)
+    sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
+    assert sidecar["clips"][0]["layout"] == "split" and [g["type"] for g in sidecar["graphics"]] == ["fan", "steps"]
+    assert all(g["region"] == "top" for g in sidecar["graphics"])
+    # panel margin: the bottom-left corner of the frame is backdrop (dark navy), not footage, while the split clip plays
+    r, g, b = mean_rgb(final, 1.0, "crop=iw*0.03:ih*0.03:0:ih*0.96")
+    assert r < 60 and g < 60 and b < 100, (r, g, b)
+    # inside the panel the footage shows (testsrc2 is bright)
+    r2, g2, b2 = mean_rgb(final, 1.0, "crop=iw*0.3:ih*0.15:iw*0.35:ih*0.72")
+    assert (r2 + g2 + b2) > (r + g + b) + 100, (r2, g2, b2)
+    # phone video inset at 2.5 s: green B-roll inside, a dark bezel ring just outside it
+    r3, g3, b3 = mean_rgb(final, 2.5, "crop=iw*0.1:ih*0.04:iw*0.45:ih*0.23")
+    assert g3 > 90 and g3 > 2 * r3 and g3 > 2 * b3, (r3, g3, b3)
+    pw = 0.34
+    r4, g4, b4 = mean_rgb(final, 2.5, f"crop=iw*0.012:ih*0.04:iw*{0.5 - pw / 2 + 0.002}:ih*0.23")
+    assert r4 + g4 + b4 < 120, (r4, g4, b4)
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
+    assert not [k for k, v in s.items() if v == "FAIL"], s
+
+
+def test_long_form_16x9_render(footage):
+    edl = footage / "work" / "edl" / "L_offer_angle_hook_5s_16x9_v1.yaml"
+    edl.write_text("""
+name: L_offer_angle_hook_5s_16x9_v1
+ratio: "16:9"
+hook_text: "Long form works too"
+hook_text_seconds: 1.0
+clips:
+  - {src: raw/portrait.mp4, in: 0.0, out: 1.0, tighten: 0, layout: split}
+  - {src: raw/landscape.mp4, in: 1.0, out: 2.0, tighten: 0}
+end_card: {text: "Subscribe", seconds: 1.0}
+""")
+    final = render.render(edl, None, str(footage / "work" / "transcripts" / "landscape.words.json"), proxy=False, keep_tmp=False, out_dir=None)
+    v = common.video_stream(common.probe(final))
+    assert (int(v["width"]), int(v["height"])) == (1920, 1080)
+    assert common.ratio_of(1920, 1080) == "16:9" and common.safe_box(1920, 1080, "16:9")["bottom"] == 108
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0))
+    assert s["duration for all placements"] == "PASS" and not [k for k, v in s.items() if v == "FAIL"], s
+
+
+def test_reference5_plates_render_stills(footage):
+    cfg = common.load_config()
+    from PIL import Image
+    specs = [sp for sp in plates.demo_specs() if sp["type"] in ("fan", "steps", "timer", "quote", "files", "tracks")]
+    specs += [{"type": "fan", "cards": [f"rule {i}" for i in range(20)], "scatter": True, "duration": 3},
+              {"type": "pip", "src": str(footage / "raw" / "still.png"), "device": "browser", "title": "auburnseo.com", "w": 0.8, "y": 0.3, "duration": 3},
+              {"type": "bezel", "device": "phone", "x": 120, "y": 150, "w": 300, "h": 520, "duration": 1},
+              {"type": "chips", "items": [{"text": "Drop", "check": True}, {"text": "Cut"}], "duration": 2}]
+    assert {sp["type"] for sp in specs} >= {"fan", "steps", "timer", "quote", "files", "tracks", "bezel"}
+    r = plates.Renderer(540, 960)
+    try:
+        for sp in specs:
+            h = plates.build_html(sp, 540, 960, cfg)
+            assert "{{" not in h, sp["type"]
+            r.render_still(h, 1.4, footage / "work" / f"still5_{sp['type']}{'_s' if sp.get('scatter') else ''}.png")
+    finally:
+        r.close()
+    bz = Image.open(footage / "work" / "still5_bezel.png").convert("RGBA")
+    assert bz.getpixel((270, 400))[3] == 0 and bz.getpixel((122, 400))[3] > 200      # transparent inside, dark ring at the edge
+    fan = Image.open(footage / "work" / "still5_fan.png").convert("RGBA")
+    assert fan.getpixel((270, 230))[3] > 0 or fan.getpixel((270, 300))[3] > 0        # the middle card sits above centre
+    h = plates.build_html({"type": "timer", "label": "x", "from": 125, "rate": 1, "duration": 2}, 540, 960, cfg)
+    assert "from = 125.0" in h
+    h = plates.build_html({"type": "captions", "words": WORDS[:2], "style": "word", "position": "mid", "duration": 2}, 540, 960, cfg)
+    assert 'style-word  mid' in h
+
+
+def test_pipeline_runs_the_assembly_line(footage):
+    import pipeline
+    edl = footage / "work" / "edl" / "P_offer_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: P_offer_angle_hook_5s_9x16_v1
+hook_text: "One command"
+hook_text_seconds: 1.0
+clips:
+  - {src: raw/landscape.mp4, in: 0.5, out: 4.5, tighten: 0}
+end_card: {text: "Tap Learn More", seconds: 1.0}
+""")
+    assert pipeline.sources_of(edl) == [footage / "raw" / "landscape.mp4"]
+    rc = subprocess.run([sys.executable, str(ROOT / "tools" / "pipeline.py"), str(edl), "--only", "2,3,5,6,8,10"],
+                        capture_output=True, text=True, cwd=str(footage))
+    assert rc.returncode == 0, rc.stdout[-2000:] + rc.stderr[-2000:]
+    assert "every take already transcribed" in rc.stdout and "[x]  6. Captions" in rc.stdout and "from the source transcripts" in rc.stdout
+    assert (footage / "exports" / "P_offer_angle_hook_5s_9x16_v1.mp4").exists() and (footage / "review" / "index.html").exists()
+    assert (footage / "qa" / "REPORT.md").exists()

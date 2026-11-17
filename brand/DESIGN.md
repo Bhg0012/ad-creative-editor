@@ -179,3 +179,46 @@ showing a review) floating as cutouts, not a mascot pretending to be a product.
 
 Not adopted: voice-only sound (keep the low music bed), the clipped peak, 4-6 s cards (ours are
 2-3 s in a 30-45 s ad), text-only captions moving around the frame per word.
+
+## Reference 5 (2026-11-17): "I bought every AI video editor", 80 s, 9:16, course-creator ad
+
+Measured with `tools/reference.py` and transcribed: 80 s, 13 hard cuts (median shot 5.2 s), but 1.47
+visual changes per second (4.0 per second in the hook), -14.1 LUFS, true peak -1.0, a music bed.
+The script is a three-reasons structure: hook with a claim ("I bought every AI video editor so you
+don't have to"), three problems, "so I built the other 90%", proof of work (10 years, 100 templates,
+dozens of layouts, thousands of rules), the mechanism as a 10-step assembly line, CTA.
+
+What it does on screen:
+- **Speaker in a rounded, inset panel** with a neon-blue edge glow, over a dark navy grid stage. The
+  panel is the bottom 40-45% of the frame with a small margin all round. Full-frame cutaways from a
+  second angle and a second room break it up every 10-15 s.
+- **Captions** one to two words, white, heavy, soft shadow, sitting in the seam between the stage and
+  the panel (about 44-50% of the frame). Full-frame shots put them at about 65%.
+- **Stage graphics, one per idea, 2-4 s:** a fan of cards arched over the head with view-count badges;
+  an editing timeline with the right 90% dimmed and a big "10%"; phone mockups with a reel playing
+  inside; a document icon; a comment card; a red "TIME SPENT FIXING" running clock with a small "fix
+  this cut" note; a grid of project files with years; a swarm of small cards flung outward
+  ("thousands of rules"); a browser window; a numbered 10-step checklist that completes itself row
+  by row with progress pills and an expanding sub-panel (storyboard strip, waveform); a row of five
+  small step icons with check badges.
+- **Sound:** pops and clicks on graphics, a bed under everything, voice clean.
+
+Adopted (all usable from the EDL, see `scripts-and-editing.md`):
+- `split: {style: panel}` (or `edit.split_style: panel` in config): the speaker band becomes a rounded,
+  inset panel with a brand-colour glow. `margin`, `radius` and `glow` are tunable.
+- `caption_position: mid` puts the captions in the seam.
+- Plates: `fan` (images or text cards in an arc, `badge` per card, `scatter: true` for the swarm),
+  `steps` (numbered checklist that completes itself, optional thumbnail per row), `timer` (running
+  clock with a red label and a note pill), `quote` (a real comment or review as a plain card),
+  `files` (document icons with a badge letter, label, year), `tracks` (timeline rows with a bright
+  window and a share label), `chips` items take `check: true`.
+- Video insets take `pip.device: phone` or `browser` (a frame drawn around the video); still insets
+  take `device: browser` with a `title`.
+- **16:9 long form** (`ratio: "16:9"`, 1920x1080 or 2560x1440) for YouTube, VSLs and course videos:
+  same EDL, same plates, safe zone for player controls, the 60 s ad rule switched off.
+- **The assembly line as one command:** `tools/pipeline.py <edl>` runs inventory, transcription,
+  storyboard, render, captions from the source, other ratios, QA, copy lint and the review page
+  in order with a ticked checklist. That is the "10 step" idea, made of the tools that already exist.
+
+Not adopted: the form-window mockup that imitates a lead form (never imitate Meta UI), the sponsored
+tag, 4-6 s cards (ours are 2-3 s in a 30-45 s ad), text that moves around the frame per word.

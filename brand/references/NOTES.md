@@ -8,3 +8,5 @@ ref3 ("Claude Code edited this entire video", 82 s): speaker in a bottom band, d
 numbered cards, wireframe diagrams, one giant word takeovers, struck-through lists, progress bar on top, one-word captions in red/green, 1.07x punches, no whooshes.
 ref4 (creator ad, 70 s): boxless three-line hook, one-word captions that move above the head, floating 3D cutouts with no card,
 cream dotted-paper takeovers with words landing one at a time, white notice card, giant word over the footage, warm dim grade. Voice only.
+ref5 (course-creator ad, 80 s): speaker in a rounded inset panel with a neon-blue glow over a navy grid stage; captions in the seam;
+card fans, timeline mock with 90% dimmed, phone and browser mockups, running timer, comment card, file grid, card swarm, a 10-step self-completing checklist.

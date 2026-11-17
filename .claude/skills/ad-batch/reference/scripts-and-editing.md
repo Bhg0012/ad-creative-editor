@@ -102,12 +102,23 @@ Every graphic is a motion plate: an HTML template in `tools/plates/` filled from
 | `plates[] type: toast` | small white notice card: `title` with a dot, `text`; `position` | "review request sent", "appointment booked" moments (generic, never a copy of a real app) |
 | `plates[] type: takeover` with `bg: paper` or `bg: none` | giant word on the cream sheet, or straight on the footage | one-word turns, the brand word at the CTA |
 | `backdrop: {style: paper}` (EDL root) | cream dotted sheet instead of navy for `layout: split` | the light, friendly version of the split layout |
+| `split: {style: panel}` (EDL root) | the speaker band becomes a rounded, inset panel with a brand-colour glow (`margin`, `radius`, `glow`) | the dark studio look (reference 5); `caption_position: mid` puts captions in the seam |
+| `plates[] type: fan` | `cards` (text) or `images` in an arc over the head, `badge` per card; `scatter: true` for a swarm | "every job we did this month", "all the reviews", a pile of rules or steps |
+| `plates[] type: steps` | numbered checklist that completes itself row by row with progress pills; `title`, `items` (text or `{text, image}`), `step` seconds per row | the mechanism in order, what happens after they sign |
+| `plates[] type: timer` | running clock in a dark card, red `label`, `from` seconds, `rate` (seconds per second), optional `note` and `note_time` | time wasted the old way |
+| `plates[] type: quote` | a real comment or review: `name`, `when`, `text` (`*word*` accent), `likes`, `source`, optional `avatar` | social proof, only real and with permission |
+| `plates[] type: files` | grid of document icons, `items` with `label`, `sub`, `badge` letter | years of work, a stack of jobs |
+| `plates[] type: tracks` | timeline or schedule rows (`rows` with `label`, `blocks` [start, width, text]); `highlight: {from, to, label}` dims the rest | "the 10% you see", a week of jobs |
+| `broll[]` video with `pip.device: phone` or `browser` | a phone or browser frame drawn around the video inset (`title` for the browser) | a screen recording, a reel playing on a phone |
+| `chips` items with `check: true` | a check badge on the chip | steps already done |
 | `broll[]` still with `pip` | rounded, shadowed inset with slow zoom; `pip.device: phone` adds a bezel; `label` becomes a caption | screenshots, review cards, photos |
 | `broll[]` video with `pip` | rounded, shadowed video inset | a phone screen recording over the speaker |
 | `broll[]` with `speaker_inset: {w, x, y}` | the B-roll fills the frame and the speaker stays in a rounded corner inset (from the A-roll, lip sync untouched) | "the screen is the set": a screen recording or dashboard while the mechanism is explained (`brand/DESIGN.md`, reference 1) |
 | `lower_third` | name tag sliding in (`text: "Bruce, Auburn AL"` splits into name and sub) | the hook only |
 | `end_card` | brand background, logo pop, `headline`, pulsing CTA button, `subtext` | the last 2-3 s |
 | `captions` (config `captions.engine: html`) | word-timed pages, `pill` (spoken word in an accent pill), `highlight`, or `clean` | every ad |
+
+Long form: `ratio: "16:9"` renders 1920x1080 or 2560x1440 for YouTube, VSLs and course videos from the same EDL (split layout is ignored there; the 60 s placement rule is off). One command for the whole edit: `.venv/bin/python tools/pipeline.py work/edl/<adname>.yaml` runs inventory, transcription, storyboard, render, source captions, other ratios (`--all-ratios`), QA, copy lint and the review page in order and prints the ticked checklist; `--proxy` stops after the rough cut, `--only 5,6,8` reruns chosen steps.
 
 Positions: `position: top | center | lower | stage` (center means the card's centre at 38% of the frame, above the caption band; stage is the open area above a `layout: split` speaker). Web pages as B-roll: `.venv/bin/python tools/capture.py <url> --out raw/broll_site.png` (or `--scroll 6 --out raw/broll_site.mp4` for a scroll-through), then use it as a `pip` or `speaker_inset` B-roll. Preview every plate on its frame with `tools/render.py <edl> --storyboard` before rendering; one still per type with `tools/plates.py demo --out work/plates_demo`.
 

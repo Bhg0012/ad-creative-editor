@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* tracks: rows of labelled blocks like an editing timeline or a schedule, with an optional bright window and a big share label (reference 5: "10% of what you need") */
+.wrap { position: absolute; left: 50%; top: {{top}}px; transform: translateX(-50%); width: calc(var(--W) - 2 * var(--safe-side) - .02 * var(--W)); background: rgba(10,14,24,.82); border: 2px solid rgba(255,255,255,.1); border-radius: 18px; padding: 14px; animation: plate-in .4s var(--spring) both, plate-out .25s ease-in both; animation-delay: 0s, calc(var(--dur) - .25s); }
+.row { display: flex; align-items: center; gap: 10px; height: {{row_h}}px; margin-bottom: 8px; }
+.row:last-child { margin-bottom: 0; }
+.lab { flex: 0 0 3.2em; font-size: calc({{size}}px * .62); font-weight: 800; color: rgba(255,255,255,.75); text-align: right; padding-right: 6px; }
+.lane { flex: 1 1 auto; position: relative; height: 100%; border-radius: 8px; background: rgba(255,255,255,.05); overflow: hidden; }
+.b { position: absolute; top: 15%; height: 70%; border-radius: 6px; background: var(--c); opacity: .9; animation: blk .4s var(--ease-out) both; transform-origin: left; }
+@keyframes blk { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.b span { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: calc({{size}}px * .5); font-weight: 700; color: rgba(255,255,255,.9); white-space: nowrap; }
+.dim { position: absolute; top: 0; bottom: 0; background: rgba(0,0,0,.62); animation: plate-in .5s var(--ease-out) both; animation-delay: {{dim_delay}}s; }
+.share { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: calc({{size}}px * 2.6); font-weight: 800; color: #fff; text-shadow: 0 4px 14px rgba(0,0,0,.6); animation: plate-in .4s var(--spring) both; animation-delay: {{dim_delay}}s; }
+</style></head><body><div class="stage"><div class="wrap">{{rows_html}}{{dim_html}}{{share_html}}</div></div><script>{{harness}}</script></body></html>

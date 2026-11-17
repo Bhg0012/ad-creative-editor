@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* quote: a real comment or review as a plain white card (avatar initials, name, time, text, count). Generic by design: not a copy of any app's UI. */
+.quote { background: #fff; color: var(--ink); padding: .8em .95em .7em; width: calc(var(--W) - 2 * var(--safe-side) - .16 * var(--W)); border-radius: 22px; }
+.quote.in.center-x { animation-name: plate-in-x; } .quote.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.head { display: flex; align-items: center; gap: .55em; font-size: calc({{size}}px * .55); font-weight: 700; color: rgba(15,17,21,.6); margin-bottom: .45em; }
+.av { width: 1.9em; height: 1.9em; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .95em; overflow: hidden; } .av img { width: 100%; height: 100%; object-fit: cover; }
+.name { color: var(--ink); }
+.text { font-size: {{size}}px; font-weight: 700; line-height: 1.22; white-space: pre-wrap; }
+.text em { font-style: normal; color: var(--accent); }
+.foot { display: flex; gap: 1.2em; margin-top: .5em; font-size: calc({{size}}px * .5); font-weight: 700; color: rgba(15,17,21,.5); }
+.foot .heart { color: #e0405a; }
+</style></head><body><div class="stage">
+<div class="card quote in out center-x {{pos}}" style="{{style}}"><div class="head"><div class="av">{{avatar}}</div><span class="name">{{name}}</span><span>{{when}}</span></div><div class="text">{{text}}</div><div class="foot">{{foot_html}}</div></div>
+</div><script>{{harness}}</script></body></html>
