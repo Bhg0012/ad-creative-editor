@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* timer: a running clock in a dark card with a red label ("TIME SPENT FIXING 0:02:19"), optional note pill under it */
+.timer { padding: .5em .9em .55em; display: flex; align-items: center; gap: 1em; border: 2px solid rgba(255,255,255,.1); }
+.timer.in.center-x { animation-name: plate-in-x; } .timer.out.center-x { animation-name: plate-out-x; }
+@keyframes plate-in-x  { from { opacity: 0; transform: translate3d(-50%, calc(var(--ty) + 24px), 0) scale(.92); } to { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } }
+@keyframes plate-out-x { from { opacity: 1; transform: translate3d(-50%, var(--ty), 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, calc(var(--ty) - 12px), 0) scale(.96); } }
+.lbl { font-size: calc({{size}}px * .5); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: {{color}}; }
+.clock { font-size: {{size}}px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: #fff; }
+.note { position: absolute; left: 50%; transform: translateX(-50%); margin-top: calc({{size}}px * 1.9); background: #fff; color: var(--ink); font-size: calc({{size}}px * .48); font-weight: 700; padding: .4em .8em; border-radius: 14px; box-shadow: var(--shadow); display: flex; align-items: center; gap: .5em; animation: plate-in .35s var(--spring) both; animation-delay: .6s; }
+.note .dot { width: .8em; height: .8em; border-radius: 50%; background: {{color}}; }
+.note b { color: var(--primary); }
+</style></head><body><div class="stage">
+<div class="card timer in out center-x dark {{pos}}" style="{{style}}"><div class="lbl">{{label}}</div><div class="clock" id="c">0:00:00</div></div>
+{{note_html}}
+</div><script>{{harness}}
+(function(){
+  var el = document.getElementById('c'), from = {{from}}, rate = {{rate}};
+  function fmt(s){ s = Math.max(0, Math.floor(s)); var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; return h + ':' + (m<10?'0':'') + m + ':' + (x<10?'0':'') + x; }
+  window.__tick = function (t) { el.textContent = fmt(from + t * rate); };
+  window.__tick(0);
+})();
+</script></body></html>

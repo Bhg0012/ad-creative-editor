@@ -4,6 +4,11 @@
 @keyframes pip-in  { from { opacity: 0; transform: translate3d(-50%, 30px, 0) scale(.9); } to { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); } }
 @keyframes pip-out { from { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); } to { opacity: 0; transform: translate3d(-50%, -10px, 0) scale(.96); } }
 .frame.phone { border: 14px solid #15171c; border-radius: 54px; background: #000; }
+/* browser: a window bar with three dots and a title above the screenshot (reference 5) */
+.frame.browser { border-radius: 18px; background: #1d2027; border: 2px solid rgba(255,255,255,.14); }
+.bar { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #1d2027; }
+.bar i { width: 11px; height: 11px; border-radius: 50%; display: block; } .bar i:nth-child(1) { background: #ff5f57; } .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+.bar span { margin: 0 auto; font-size: 17px; font-weight: 700; color: rgba(255,255,255,.7); }
 /* cutout: a transparent PNG (mascot, product, illustration) floating with no frame, just a soft shadow under it */
 .frame.cutout { background: transparent; box-shadow: none; border-radius: 0; overflow: visible; }
 .frame.cutout img { filter: drop-shadow(0 18px 22px rgba(0,0,0,.35)); }
@@ -19,7 +24,7 @@ img { display: block; width: 100%; height: auto; transform-origin: {{origin}}; a
 .hl { position: absolute; height: {{hl_h}}px; left: {{hl_x}}px; top: {{hl_y}}px; width: {{hl_w}}px; background: var(--accent); opacity: .42; border-radius: 6px; transform-origin: left; animation: hl .45s var(--ease-out) both; animation-delay: .4s; }
 @keyframes hl { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 </style></head><body><div class="stage">
-<div class="frame in out {{device}}" style="top: {{top}}px;"><div class="bob {{float}}"><img src="{{src}}"></div>{{hl_html}}</div>
+<div class="frame in out {{device}}" style="top: {{top}}px;">{{bar_html}}<div class="bob {{float}}"><img src="{{src}}"></div>{{hl_html}}</div>
 {{stamp_html}}
 {{caption_html}}
 </div><script>{{harness}}</script></body></html>

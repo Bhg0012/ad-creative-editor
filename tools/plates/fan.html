@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* fan: cards spread in an arc over the speaker's head like a hand of playing cards (reference 5); scatter: a swarm of small cards flung out */
+.fan { position: absolute; left: 50%; top: {{cy}}px; width: 0; height: 0; animation: plate-out .25s ease-in both; animation-delay: calc(var(--dur) - .25s); }
+.c { position: absolute; left: 0; top: 0; width: {{card_w}}px; transform: translate(-50%, -50%) rotate(var(--th)) translateY(var(--r)) rotate(var(--rot)); transform-origin: center; border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); background: #fff; animation: fan-in .55s var(--spring) both; }
+@keyframes fan-in { from { opacity: 0; transform: translate(-50%, -50%) rotate(0deg) translateY(0) scale(.5); } to { opacity: 1; transform: translate(-50%, -50%) rotate(var(--th)) translateY(var(--r)) rotate(var(--rot)) scale(1); } }
+.c img { display: block; width: 100%; height: auto; }
+.c .txt { padding: .7em .6em; font-size: {{size}}px; font-weight: 800; color: var(--ink); text-align: center; line-height: 1.15; }
+.c.dark { background: #15181f; } .c.dark .txt { color: #fff; }
+.badge { position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,.72); color: #fff; font-size: calc({{size}}px * .7); font-weight: 800; padding: .25em .5em; border-radius: 10px; }
+.scatter .c { width: {{chip_w}}px; border-radius: 12px; } .scatter .c .txt { font-size: calc({{size}}px * .62); padding: .45em .4em; }
+</style></head><body><div class="stage"><div class="fan {{mode}}">{{cards_html}}</div></div><script>{{harness}}</script></body></html>

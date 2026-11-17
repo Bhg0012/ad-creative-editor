@@ -16,6 +16,13 @@ Plate types:
     endcard      brand background, logo pop, headline, pulsing CTA button, subtext
     captions     word-timed captions: pill (spoken word in an accent pill), highlight, clean, box, word
     words        words landing one at a time at their own sizes, on paper / dark / nothing (reference 4)
+    fan          cards spread in an arc over the head (images or text, view-count badges), or a scatter swarm
+    steps        numbered checklist that completes itself row by row with progress pills
+    timer        running clock in a dark card with a red label, optional note pill
+    quote        a real comment or review as a plain white card (avatar initials, name, time, text)
+    files        grid of document icons with a badge letter, label and sub line
+    tracks       rows of labelled blocks (timeline or schedule) with a bright window and share label
+    bezel        phone or browser frame drawn around a video inset ffmpeg placed
     toast        small white notice card with an optional title and dot
 
 Usage:
@@ -43,11 +50,13 @@ SIZES = {  # font size as a fraction of frame height
     "lower_third": 0.034, "hook": 0.046, "endcard": 0.056, "captions": 0.044,
     "step": 0.04, "grid": 0.05, "before_after": 0.08, "chips": 0.042, "frame_label": 0.026,
     "takeover": 0.14, "strike": 0.046, "progress": 0.0, "backdrop": 0.0, "words": 0.075, "toast": 0.03,
+    "fan": 0.03, "steps": 0.03, "timer": 0.06, "quote": 0.034, "files": 0.024, "tracks": 0.026, "bezel": 0.0,
 }
 ENTRANCE_SFX = {"label": "pop", "stat": "ding", "compare": "pop", "card": "pop", "pip": "pop",
                 "lower_third": "click", "hook": None, "endcard": "riser", "captions": None,
                 "step": "click", "grid": "pop", "before_after": "thud", "chips": "click", "frame_label": "click",
-                "takeover": "thud", "strike": "pop", "progress": None, "backdrop": None, "words": "click", "toast": "pop"}
+                "takeover": "thud", "strike": "pop", "progress": None, "backdrop": None, "words": "click", "toast": "pop",
+                "fan": "swipe", "steps": "click", "timer": "click", "quote": "pop", "files": "pop", "tracks": "click", "bezel": None}
 REGION = {"top": "top", "center": "center", "lower": "lower"}
 PAPER_BG = "#f3f0ea"    # cream dotted-grid sheet (reference 4)
 PAPER_INK = "#4a1c1c"   # the deep maroon type on it
@@ -129,8 +138,10 @@ def region_of(spec: dict) -> str:
         return "top"
     if kind in ("lower_third", "captions"):
         return "lower"
-    if kind in ("endcard", "frame_label", "takeover", "progress", "backdrop", "words"):
+    if kind in ("endcard", "frame_label", "takeover", "progress", "backdrop", "words", "bezel"):
         return "full"
+    if kind in ("fan", "steps", "files", "tracks"):
+        return "top"
     pos = str(spec.get("position") or "center")
     return pos if pos in REGION else "center"
 
@@ -206,7 +217,8 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
                 b, sm = it.get("text", ""), it.get("sub", "")
             else:
                 b, sm = str(it), ""
-            chips.append(f'<div class="chip" style="animation-delay:{0.25 + 0.12 * i:.2f}s"><b>{esc(b)}</b>' + (f"<small>{esc(sm)}</small>" if sm else "") + "</div>")
+            ck = '<span class="ck">&#10003;</span>' if (isinstance(it, dict) and it.get("check")) else ""
+            chips.append(f'<div class="chip" style="animation-delay:{0.25 + 0.12 * i:.2f}s">{ck}<b>{esc(b)}</b>' + (f"<small>{esc(sm)}</small>" if sm else "") + "</div>")
         return fill("chips", {"theme": th, "size": size, "variant": variant, "pos": pos, "style": style, "cols": cols,
                               "title": emph(spec.get("title", "")).replace("<em>", '<span class="acc">').replace("</em>", "</span>"),
                               "chips_html": "".join(chips)})
@@ -251,6 +263,117 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
         chip_html = f'<div class="chip"><span class="dot"></span>{esc(chip)}</div>' if chip else ""
         return fill("words", {"theme": th, "size": size, "bg": bg, "color": color, "words_html": " ".join(parts), "chip_html": chip_html,
                               "chip_delay": f"{window + 0.1:.3f}", "dots_html": '<div class="dots"></div>' if bg_key == "paper" else ""})
+    if kind == "fan":
+        import math as _m
+        items = list(spec.get("images") or spec.get("cards") or [])
+        scatter = bool(spec.get("scatter"))
+        n = max(1, len(items))
+        spread = float(spec.get("spread") or min(110, 26 * n))
+        radius = height * float(spec.get("radius") or 0.21)
+        cy = round(height * float(spec.get("y") or 0.42))
+        cards = []
+        seed = 7
+        for i, it in enumerate(items[:40 if scatter else 9]):
+            if scatter:
+                seed = (seed * 1103515245 + 12345) % (2 ** 31)
+                ang, r, rot = (seed % 360), height * (0.08 + 0.34 * ((seed >> 8) % 1000) / 1000), ((seed >> 16) % 80) - 40
+            else:
+                ang = -spread / 2 + spread * (i / max(1, n - 1)) if n > 1 else 0.0
+                r, rot = -radius, 0.0
+            if isinstance(it, dict):
+                src, text, badge, dark = it.get("src"), it.get("text"), it.get("badge"), it.get("dark")
+            elif str(it).lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".heic")):
+                src, text, badge, dark = str(it), None, None, False
+            else:
+                src, text, badge, dark = None, str(it), None, False
+            inner = f'<img src="{data_uri(src)}">' if src else f'<div class="txt">{emph(text or "")}</div>'
+            if badge:
+                inner += f'<div class="badge">{esc(badge)}</div>'
+            delay = 0.05 * i if not scatter else 0.02 * i
+            cards.append(f'<div class="c {"dark" if dark else ""}" style="--th:{ang:.1f}deg;--r:{r:.0f}px;--rot:{rot:.1f}deg;z-index:{100 - abs(int(ang))};animation-delay:{delay:.2f}s">{inner}</div>')
+        return fill("fan", {"theme": th, "size": size, "cy": cy, "card_w": round(width * float(spec.get("w") or 0.27)),
+                            "chip_w": round(width * 0.17), "mode": "scatter" if scatter else "", "cards_html": "".join(cards)})
+    if kind == "steps":
+        items = [it if isinstance(it, dict) else {"text": str(it)} for it in (spec.get("items") or [])][:10]
+        n = max(1, len(items))
+        step = float(spec.get("step") or (duration * 0.82 / n))
+        rows = []
+        for i, it in enumerate(items):
+            thumb = f'<div class="thumb"><img src="{data_uri(it["image"])}"></div>' if it.get("image") else ""
+            rows.append(f'<div class="row" style="animation-delay:{0.06 * i:.2f}s"><span class="n">{i + 1}</span><span class="t">{esc(it.get("text", ""))}</span>{thumb}<span class="bar"><i></i></span></div>')
+        title = f'<div class="title">{esc(spec["title"])}</div>' if spec.get("title") else ""
+        top = round(height * float(spec.get("y") or 0.07))
+        return fill("steps", {"theme": th, "size": size, "top": top, "title_html": title, "rows_html": "".join(rows),
+                              "step": f"{step:.3f}", "start": f"{float(spec.get('start') or 0.3):.3f}"})
+    if kind == "timer":
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        note = spec.get("note")
+        note_html = ""
+        if note:
+            when = esc(spec.get("note_time") or "")
+            note_html = f'<div class="note {pos or "pos-center"}" style="{style}"><span class="dot"></span>' + (f"<b>{when}</b>" if when else "") + f"{esc(note)}</div>"
+        return fill("timer", {"theme": th, "size": size, "pos": pos or "pos-center", "style": style, "label": esc(spec.get("label", "time spent")),
+                              "color": str(spec.get("color") or "#ff4d4d"), "from": f"{float(spec.get('from') or 0):.1f}",
+                              "rate": f"{float(spec.get('rate') or 60):.2f}", "note_html": note_html})
+    if kind == "quote":
+        name = str(spec.get("name") or "Customer")
+        avatar = f'<img src="{data_uri(spec["avatar"])}">' if spec.get("avatar") else esc("".join(w[0] for w in name.split()[:2]).upper())
+        foot = []
+        if spec.get("likes") is not None:
+            foot.append(f'<span><span class="heart">&#9829;</span> {esc(str(spec["likes"]))}</span>')
+        if spec.get("source"):
+            foot.append(f"<span>{esc(spec['source'])}</span>")
+        return fill("quote", {"theme": th, "size": size, "pos": pos or "pos-center", "style": style, "avatar": avatar, "name": esc(name),
+                              "when": esc(spec.get("when") or ""), "text": emph(spec.get("text", "")), "foot_html": "".join(foot)})
+    if kind == "files":
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        items = [it if isinstance(it, dict) else {"label": str(it)} for it in (spec.get("items") or [])][:12]
+        cols = int(spec.get("cols") or (5 if len(items) > 6 else min(4, max(2, len(items)))))
+        files = []
+        for i, it in enumerate(items):
+            files.append(f'<div class="f" style="animation-delay:{0.07 * i:.2f}s"><div class="ic"><b>{esc(str(it.get("badge") or spec.get("badge") or "A"))[:2]}</b></div>'
+                         f'<div class="lbl">{esc(it.get("label", ""))}</div>' + (f'<div class="sub">{esc(str(it["sub"]))}</div>' if it.get("sub") else "") + "</div>")
+        return fill("files", {"theme": th, "size": size, "cols": cols, "top": round(height * float(spec.get("y") or 0.07)),
+                              "badge_bg": str(spec.get("badge_bg") or colors.get("primary", "#3B96F6")), "files_html": "".join(files)})
+    if kind == "tracks":
+        colors = (cfg.get("business") or {}).get("brand_colors") or {}
+        palette = [colors.get("primary", "#3B96F6"), "#a56cf5", colors.get("accent", "#E55B13"), "#2ecc71", "#f5c542", "#ff5c8a"]
+        rows = spec.get("rows")
+        if not rows:
+            rows = [{"label": "V4", "blocks": [[0.02, 0.1, "Graphic"], [0.3, 0.1, "Graphic"], [0.55, 0.08, "Graphic"], [0.8, 0.1, "Graphic"]]},
+                    {"label": "V3", "blocks": [[0.08, 0.12, "B-roll"], [0.44, 0.1, "B-roll"], [0.7, 0.12, "B-roll"]]},
+                    {"label": "V1", "blocks": [[0.0, 0.18, "Take 1"], [0.19, 0.22, "Take 2"], [0.42, 0.2, "Take 3"], [0.63, 0.17, "Take 4"], [0.81, 0.19, "Take 5"]]},
+                    {"label": "A1", "blocks": [[0.0, 1.0, "Voice"]]},
+                    {"label": "A2", "blocks": [[0.0, 0.3, "Music"], [0.32, 0.68, "Music"]]}]
+        rows_html = []
+        for ri, r in enumerate(rows[:7]):
+            c = str(r.get("color") or palette[ri % len(palette)])
+            blocks = []
+            for bi, b in enumerate(r.get("blocks") or []):
+                x, w = float(b[0]), float(b[1])
+                lab = esc(str(b[2])) if len(b) > 2 else ""
+                blocks.append(f'<div class="b" style="--c:{c};left:{x * 100:.1f}%;width:{w * 100:.1f}%;animation-delay:{0.1 + 0.04 * bi + 0.08 * ri:.2f}s"><span>{lab}</span></div>')
+            rows_html.append(f'<div class="row"><div class="lab">{esc(str(r.get("label", "")))}</div><div class="lane">{"".join(blocks)}</div></div>')
+        hl = spec.get("highlight")   # {from, to, label}: everything outside the window dims, the label lands in the middle
+        dim_html = share_html = ""
+        if hl:
+            a, b = float(hl.get("from", 0)), float(hl.get("to", 0.1))
+            dim_html = (f'<div class="dim" style="left:0;width:calc(3.2em + 10px + ({a * 100:.1f}% - 3.2em * {a:.3f}))"></div>' if a > 0 else "") + \
+                       f'<div class="dim" style="right:0;left:calc(3.2em + 10px + {b * 100:.1f}%)"></div>'
+            if hl.get("label"):
+                share_html = f'<div class="share">{esc(str(hl["label"]))}</div>'
+        row_h = round(height * 0.04)
+        return fill("tracks", {"theme": th, "size": size, "top": round(height * float(spec.get("y") or 0.1)), "row_h": row_h,
+                               "rows_html": "".join(rows_html), "dim_html": dim_html, "share_html": share_html,
+                               "dim_delay": f"{float(spec.get('dim_delay') or 0.9):.2f}"})
+    if kind == "bezel":
+        x, y, w, h = (int(spec[k]) for k in ("x", "y", "w", "h"))
+        if str(spec.get("device") or "phone") == "browser":
+            frame = f'<div class="browser"><div class="bar"><i></i><i></i><i></i><span>{esc(spec.get("title") or "")}</span></div></div>'
+        else:
+            frame = '<div class="phone"><div class="notch"></div></div>'
+        return fill("bezel", {"theme": th, "x": x, "y": y, "w": w, "h": h, "bw": max(10, round(w * 0.03)), "radius": max(24, round(w * 0.12)),
+                              "bar_h": max(28, round(h * 0.07)), "frame_html": frame})
     if kind == "toast":
         colors = (cfg.get("business") or {}).get("brand_colors") or {}
         title = spec.get("title")
@@ -283,10 +406,10 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
         src = Path(spec["src"]).resolve()
         with Image.open(src) as im:
             iw, ih = im.size
-        device = "phone" if spec.get("device") == "phone" else ("cutout" if str(spec.get("style") or "") == "cutout" else "")
+        device = {"phone": "phone", "browser": "browser"}.get(str(spec.get("device") or ""), "cutout" if str(spec.get("style") or "") == "cutout" else "")
         frac = float(spec.get("w") or (0.58 if device else 0.78))
         frame_w = round(width * frac)
-        frame_h = round(frame_w * ih / iw) + (28 if device else 0)
+        frame_h = round(frame_w * ih / iw) + (28 if device == "phone" else (40 if device == "browser" else 0))
         cy = float(spec.get("y") or 0.42)
         top = round(cy * height - frame_h / 2)
         top = max(safe_box(width, height, ratio_of(width, height) or "9:16")["top"], top)
@@ -302,6 +425,7 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
         radius = spec.get("radius")
         return fill("pip", {"theme": th, "size": size, "frame_w": frame_w, "frame_radius": 36 if radius is None else int(radius), "device": device,
                             "float": "float" if spec.get("float") else "",
+                            "bar_html": f'<div class="bar"><i></i><i></i><i></i><span>{esc(spec.get("title") or "")}</span></div>' if device == "browser" else "",
                             "src": data_uri(src), "top": top, "zoom": float(spec.get("zoom") or (1.0 if spec.get("highlight") else 1.06)),
                             "origin": str(spec.get("origin") or "50% 40%"), "caption_html": cap_html, "stamp_html": stamp_html,
                             "stamp_top": top + frame_h // 2, **hl_vals})
@@ -361,8 +485,9 @@ def captions_html(spec: dict, th: str, size: int) -> str:
         pages_html = ("\n".join(pages[:n_low]) + f'\n</div><div class="cap style-{style} {"uc" if spec.get("uppercase") else ""} high">\n'
                       + "\n".join(pages[n_low:]))
         high = False
+    position = "high" if high else ("mid" if str(spec.get("position") or "") == "mid" else "")
     return fill("captions", {"theme": th, "size": size, "style": style, "uc": "uc" if spec.get("uppercase") else "",
-                             "position": "high" if high else "", "pages_html": pages_html})
+                             "position": position, "pages_html": pages_html})
 
 
 class Renderer:
@@ -448,6 +573,12 @@ def demo_specs() -> list[dict]:
         {"type": "words", "words": ["because", "we're", "gonna", "*text*", "them"], "chip": "AuburnSEO", "duration": 2.4},
         {"type": "toast", "title": "Review request", "text": "Sent to 14 customers (example).", "position": "0.30", "duration": 2},
         {"type": "hook", "kicker": "Building a", "text": "Review machine", "sub": "for Huntsville roofers", "variant": "clean", "duration": 3},
+        {"type": "fan", "cards": [{"text": "Review request sent", "badge": "day 1"}, {"text": "Reply written for you", "badge": "day 2"}, {"text": "5 stars posted", "badge": "day 3"}], "duration": 3},
+        {"type": "steps", "title": "What happens", "items": ["Customer finishes the job", "Text goes out", "Review lands on Google", "Reply posted for you"], "duration": 4},
+        {"type": "timer", "label": "Time spent chasing reviews", "from": 0, "rate": 90, "note": "Ask in person", "note_time": "0:03", "duration": 3},
+        {"type": "quote", "name": "Customer", "when": "example", "text": "Got *three* new reviews the first week.", "likes": 3, "source": "with permission", "duration": 3},
+        {"type": "files", "items": [{"label": "Roof repair", "sub": "2019"}, {"label": "Gutter job", "sub": "2021"}, {"label": "Re-roof", "sub": "2023"}, {"label": "Storm damage", "sub": "2024"}], "badge": "R", "duration": 3},
+        {"type": "tracks", "highlight": {"from": 0, "to": 0.1, "label": "10%"}, "duration": 3},
     ]
 
 

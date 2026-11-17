@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* bezel: a phone or browser frame drawn around a video inset that ffmpeg has already placed (x, y, w, h in px) */
+.phone { position: absolute; left: {{x}}px; top: {{y}}px; width: {{w}}px; height: {{h}}px; box-sizing: border-box; border: {{bw}}px solid #15171c; border-radius: {{radius}}px; box-shadow: var(--shadow), inset 0 0 0 2px rgba(255,255,255,.08); }
+.phone .notch { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: 34%; height: 20px; border-radius: 12px; background: #15171c; }
+.browser { position: absolute; left: {{x}}px; top: calc({{y}}px - {{bar_h}}px); width: {{w}}px; height: calc({{h}}px + {{bar_h}}px); box-sizing: border-box; border-radius: 16px; border: 2px solid rgba(255,255,255,.14); box-shadow: var(--shadow); overflow: hidden; }
+.browser .bar { height: {{bar_h}}px; background: #1d2027; display: flex; align-items: center; gap: 8px; padding: 0 14px; }
+.browser .bar i { width: 11px; height: 11px; border-radius: 50%; display: block; } .bar i:nth-child(1) { background: #ff5f57; } .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+.browser .bar span { margin-left: auto; margin-right: auto; font-size: calc({{bar_h}}px * .42); font-weight: 700; color: rgba(255,255,255,.7); }
+</style></head><body><div class="stage">{{frame_html}}</div><script>{{harness}}</script></body></html>

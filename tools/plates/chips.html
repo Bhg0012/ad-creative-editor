@@ -9,6 +9,8 @@
 .chip { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: .55em .4em .5em; text-align: center; animation: plate-in .35s var(--spring) both; }
 .light .chip { background: rgba(15,17,21,.05); border-color: rgba(15,17,21,.1); }
 .chip b { display: block; font-size: {{size}}px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.chip { position: relative; }
+.chip .ck { position: absolute; right: -6px; top: -6px; width: 1.1em; height: 1.1em; border-radius: 50%; background: var(--primary); color: #fff; font-size: calc({{size}}px * .6); font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 .chip small { display: block; margin-top: .15em; font-size: calc({{size}}px * .4); font-weight: 700; color: var(--muted); }
 </style></head><body><div class="stage">
 <div class="card chips in out center-x {{variant}} {{pos}}" style="{{style}}">

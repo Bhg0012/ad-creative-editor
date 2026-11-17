@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* steps: a numbered checklist that completes itself one row at a time, each row with a progress pill (reference 5: "10 step assembly line") */
+.list { position: absolute; left: 50%; top: {{top}}px; width: calc(var(--W) - 2 * var(--safe-side) - .06 * var(--W)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; animation: plate-out .25s ease-in both; animation-delay: calc(var(--dur) - .25s); }
+.row { display: flex; align-items: center; gap: .6em; background: rgba(10,14,24,.78); border: 2px solid rgba(255,255,255,.12); border-radius: 16px; padding: .42em .7em; font-size: {{size}}px; font-weight: 700; color: #fff; animation: plate-in .35s var(--spring) both; transition: none; }
+.row .n { flex: 0 0 auto; width: 1.5em; height: 1.5em; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; font-size: .78em; font-weight: 800; }
+.row .t { flex: 1 1 auto; }
+.row .bar { flex: 0 0 auto; width: 4.2em; height: .5em; border-radius: 999px; border: 2px solid rgba(255,255,255,.25); overflow: hidden; }
+.row .bar i { display: block; height: 100%; width: 0; background: var(--primary); }
+.row.done .n { background: #2ecc71; border-color: #2ecc71; color: #0b1a10; } .row.done .bar i { width: 100%; background: #2ecc71; }
+.row.active { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,150,246,.25), 0 0 24px rgba(59,150,246,.35); } .row.active .n { background: var(--primary); border-color: var(--primary); }
+.row .thumb { display: none; flex: 0 0 auto; width: 3.2em; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); } .row.active .thumb { display: block; } .thumb img { display: block; width: 100%; }
+.title { font-size: calc({{size}}px * .62); font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .2em; }
+</style></head><body><div class="stage"><div class="list">{{title_html}}{{rows_html}}</div></div><script>{{harness}}
+(function(){
+  var rows = document.querySelectorAll('.row'), step = {{step}}, start = {{start}};
+  window.__tick = function (t) {
+    rows.forEach(function (r, i) {
+      var a = start + i * step, b = a + step;
+      r.classList.remove('done', 'active');
+      if (t >= b) r.classList.add('done'); else if (t >= a) { r.classList.add('active'); var p = (t - a) / step; r.querySelector('.bar i').style.width = Math.round(p * 100) + '%'; }
+      else r.querySelector('.bar i').style.width = '0%';
+    });
+  };
+  window.__tick(0);
+})();
+</script></body></html>

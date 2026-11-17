@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* files: a grid of document icons with a badge letter, a label and a sub line (reference 5: ten years of project files) */
+.grid { position: absolute; left: 50%; top: {{top}}px; transform: translateX(-50%); width: calc(var(--W) - 2 * var(--safe-side) - .04 * var(--W)); display: grid; grid-template-columns: repeat({{cols}}, 1fr); gap: 14px 10px; animation: plate-out .25s ease-in both; animation-delay: calc(var(--dur) - .25s); }
+.f { text-align: center; animation: plate-in .4s var(--spring) both; }
+.ic { position: relative; width: 58%; margin: 0 auto .3em; aspect-ratio: 4 / 5; background: #f4f5f7; border-radius: 10px; clip-path: polygon(0 0, 72% 0, 100% 22%, 100% 100%, 0 100%); box-shadow: 0 10px 24px rgba(0,0,0,.35); }
+.ic b { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); width: 46%; aspect-ratio: 1; border-radius: 8px; background: {{badge_bg}}; color: #fff; display: flex; align-items: center; justify-content: center; font-size: calc({{size}}px * .9); font-weight: 800; }
+.lbl { font-size: {{size}}px; font-weight: 700; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.5); line-height: 1.15; }
+.sub { font-size: calc({{size}}px * .72); font-weight: 700; color: var(--primary); }
+</style></head><body><div class="stage"><div class="grid">{{files_html}}</div></div><script>{{harness}}</script></body></html>

@@ -71,6 +71,7 @@ edit:                          # defaults for tools/render.py (what an editor do
   alternate_zoom: 1.08
   settle_cuts: 1.04            # every cut after the first opens pushed in by this and settles over 0.25 s; `settle: 0` on a clip disables
   look: {contrast: 1.03, saturation: 1.06}   # light, consistent grade on A-roll; remove to pass footage through untouched
+  split_style: band            # band (full-width speaker band) | panel (rounded inset panel with a brand glow) for `layout: split`
   hook_text_seconds: 3.0       # how long the headline stays on from frame 1
   end_card_seconds: 2.5
   music_gain_db: -18           # music under the voice before ducking

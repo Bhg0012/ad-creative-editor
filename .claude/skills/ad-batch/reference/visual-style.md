@@ -53,6 +53,14 @@ One look per batch still holds; this is the second look available, from referenc
 - Grade: `look: {temperature: 5200, vignette: 0.35}` on dim indoor footage; skip it outdoors.
 - Still one graphic per idea, still 2-3 s each, still a low music bed. The cute comes from warmth, pastels and the bob, not from more things on screen.
 
+## The studio look (dark stage, glowing panel)
+
+The third look, from reference 5 in `brand/DESIGN.md`. Use it when the batch is mechanism-heavy and the graphics carry the argument.
+- `layout: split` on the body clips with `split: {style: panel}`; `caption_position: mid`; hook and CTA full frame.
+- Stage graphics by idea: `fan` for "look how many", `steps` for the mechanism in order, `timer` for the old way's cost, `tracks` for "the part you see", `quote` for a real review, `files` for years of work, `pip` with a phone or browser frame for a screen.
+- A full-frame cutaway from a second angle or room every 10-15 s so the panel never feels static.
+- Still one graphic per idea, 2-3 s each, a low bed, pops and clicks only.
+
 ## Sound
 
 - Voice first, always intelligible with music muted. Music is a bed, 18 to 22 dB under the voice before ducking, ducked a further 10 to 15 dB while speaking.

@@ -75,6 +75,7 @@ hook_variant: dark            # dark | light (white box, black text) | clean (no
 hook_text_seconds: 3
 progress_bar: true            # thin brand-gradient bar across the top for the whole ad (retention device)
 punches: [9.4, 15.2]          # quick 1.07x zoom punches on these key words
+split: {style: panel}         # optional: speaker in a rounded, inset panel with a brand glow instead of a full-width band (margin, radius, glow colour)
 clips:                        # A-roll in timeline order; in/out are seconds in the source. `layout: split` puts the
                               # speaker in a bottom band over the brand backdrop and gives graphics the stage above (position: stage)
   - {src: raw/take3.mov, in: 12.40, out: 15.90, zoom: 1.0, focus: auto, slot: hook}   # slot: a name variants can swap
@@ -390,12 +391,19 @@ SPLIT_BAND = 0.4375   # the speaker band in `layout: split` is the bottom 43.75%
 
 def render_segment(clip: dict, t_in: float, t_out: float, out: Path, ratio: str, out_w: int, out_h: int,
                    fps: int, enc: list[str], focus: tuple[float, float], timecode_from: float | None = None,
-                   font: str | None = None, backdrop: Path | None = None) -> None:
+                   font: str | None = None, backdrop: Path | None = None, panel: dict | None = None) -> None:
     v = clip["vstream"]
     src_w, src_h = display_size(v)
     dur = t_out - t_in
     split = clip.get("layout") == "split" and backdrop is not None
-    if split:
+    if split and panel:
+        # Panel style: the speaker sits in a rounded, inset panel with a soft brand glow behind it (reference 5).
+        pw, ph, px, py = panel["w"], panel["h"], panel["x"], panel["y"]
+        vf = video_filters(src_w, src_h, is_hdr(v), f"{pw}:{ph}", pw, ph, fps, (focus[0], min(focus[1] + 0.08, 0.6)),
+                           float(clip.get("zoom") or 1.0), clip.get("push"), dur, clip.get("_look"), clip.get("_settle"))
+        vf = (f"[0:v]{vf},format=rgba[band];[2:v]format=gray[pm];[band][pm]alphamerge[bandr];"
+              f"[1:v][3:v]overlay=x={px - panel['pad']}:y={py - panel['pad']}:shortest=1[bg];[bg][bandr]overlay=x={px}:y={py}:shortest=1,format=yuv420p")
+    elif split:
         # The speaker lives in a band at the bottom; the graphics stage above sits on the brand backdrop.
         band_h = even(out_h * SPLIT_BAND)
         band_ratio = f"{out_w}:{band_h}"
@@ -415,7 +423,10 @@ def render_segment(clip: dict, t_in: float, t_out: float, out: Path, ratio: str,
         args += ["-ss", f"{t_in:.3f}", "-t", f"{dur:.3f}", "-i", str(clip["path"])]
     if split:
         args += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", str(backdrop)]
-    a_idx = 2 if split else 1
+        if panel:
+            args += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", str(panel["mask"]),
+                     "-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", str(panel["glow"])]
+    a_idx = (4 if panel else 2) if split else 1
     if clip["still"] or clip["astream"] is None:
         args += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
         a_map = f"{a_idx}:a:0"
@@ -628,6 +639,25 @@ def rounded_mask_and_shadow(w: int, h: int, radius: int, tmp: Path, tag: str) ->
     return mask_p, sh_p, pad
 
 
+def panel_mask_and_glow(w: int, h: int, radius: int, tmp: Path, color: str) -> tuple[Path, Path, int]:
+    """Rounded mask for the speaker panel of a split layout plus a soft coloured glow behind it (reference 5's neon edge)."""
+    from PIL import Image, ImageDraw, ImageFilter
+
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
+    mask_p = tmp / "panel_mask.png"
+    mask.save(mask_p)
+    pad = max(36, radius)
+    c = color.lstrip("#")
+    rgb = tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
+    glow = Image.new("RGBA", (w + 2 * pad, h + 2 * pad), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).rounded_rectangle((pad - 6, pad - 6, pad + w + 5, pad + h + 5), radius=radius + 6, fill=(*rgb, 150))
+    glow = glow.filter(ImageFilter.GaussianBlur(pad / 2.2))
+    glow_p = tmp / "panel_glow.png"
+    glow.save(glow_p)
+    return mask_p, glow_p, pad
+
+
 # ---------- composite ----------
 
 def drawtext_block(font: str, textfile: Path, size: int, color: str, y_expr: str, start: float, end: float,
@@ -703,7 +733,9 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
                            ENC_INTER, (0.5, 0.5))
             cx, cy = float(pip.get("x") or 0.5), float(pip.get("y") or 0.40)
             px, py = even(cx * out_w - pw / 2), even(cy * out_h - ph / 2)
-            mask_p, sh_p, pad = rounded_mask_and_shadow(pw, ph, round(out_w * 0.035), tmp, f"pip{idx}")
+            device = str(pip.get("device") or "")
+            radius = round(pw * 0.12) if device == "phone" else (round(out_w * 0.016) if device == "browser" else round(out_w * 0.035))
+            mask_p, sh_p, pad = rounded_mask_and_shadow(pw, ph, radius, tmp, f"pip{idx}")
             inputs += ["-i", str(seg), "-loop", "1", "-i", str(mask_p), "-loop", "1", "-i", str(sh_p)]
             vchain.append(f"[{idx}:v]setpts=PTS-STARTPTS+{at:.3f}/TB,format=rgba[bv{idx}]")
             vchain.append(f"[{idx + 1}:v]format=gray[bm{idx}]")
@@ -711,6 +743,22 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
             vchain.append(f"{cur}[{idx + 2}:v]overlay=x={px - pad}:y={py - pad}:{win}[bs{idx}]")
             vchain.append(f"[bs{idx}][br{idx}]overlay=x={px}:y={py}:eof_action=pass:{win}[v{idx}]")
             idx += 2
+            if device in ("phone", "browser") and use_html:
+                # A phone or browser frame drawn by the plates engine around the video inset (reference 5).
+                import plates as pl  # noqa: WPS433
+
+                bezel_p = tmp / f"bezel_{idx}.png"
+                rb = pl.Renderer(out_w, out_h)
+                try:
+                    rb.render_still(pl.build_html({"type": "bezel", "device": device, "x": px, "y": py, "w": pw, "h": ph,
+                                                   "title": pip.get("title") or "", "duration": 1}, out_w, out_h, cfg), 0.1, bezel_p)
+                finally:
+                    rb.close()
+                inputs += ["-loop", "1", "-i", str(bezel_p)]
+                idx += 1
+                vchain.append(f"[{idx}:v]format=rgba[bz{idx}]")
+                vchain.append(f"[v{k}][bz{idx}]overlay=x=0:y=0:{win}[v{idx}]")
+                k = idx
         else:
             render_segment(clip, src_in, src_in + dur, seg, ratio, out_w, out_h, fps, ENC_INTER, (0.5, 0.5))
             inputs += ["-i", str(seg)]
@@ -1075,6 +1123,11 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         timeline_clips = []
         keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
         backdrop = None
+        panel = None
+        if any(c.get("layout") == "split" for c in edl["clips"]) and ratio == "16:9":
+            print("WARNING: layout: split is for vertical ads; rendering 16:9 full frame")
+            for c in edl["clips"]:
+                c.pop("layout", None)
         if any(c.get("layout") == "split" for c in edl["clips"]) and plates_available(cfg):
             import plates as pl  # noqa: WPS433
 
@@ -1084,6 +1137,16 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
                 r.render_still(pl.build_html({"type": "backdrop", "duration": 1, **(edl.get("backdrop") or {})}, out_w, out_h, cfg), 0.1, backdrop)
             finally:
                 r.close()
+            sp = edl.get("split") or {}
+            style_ = str(sp.get("style") or (cfg.get("edit") or {}).get("split_style") or "band")
+            if style_ == "panel":
+                margin = even(out_w * float(sp.get("margin") or 0.04))
+                band_h = even(out_h * SPLIT_BAND)
+                pw, ph = even(out_w - 2 * margin), even(band_h - margin)
+                colors = (cfg.get("business") or {}).get("brand_colors") or {}
+                mask_p, glow_p, pad = panel_mask_and_glow(pw, ph, round(out_w * float(sp.get("radius") or 0.06)), tmp,
+                                                          str(sp.get("glow") or colors.get("primary", "#3B96F6")))
+                panel = {"w": pw, "h": ph, "x": margin, "y": out_h - band_h, "mask": mask_p, "glow": glow_p, "pad": pad}
         apply_editor_defaults(edl, cfg)
         look = edl.get("look") or (cfg.get("edit") or {}).get("look")
         for n, c in enumerate(edl["clips"]):
@@ -1100,7 +1163,7 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
             for k, (a, b) in enumerate(ranges):
                 seg = tmp / f"seg_{n:02d}_{k:02d}.mp4"
                 render_segment(c, a, b, seg, ratio, out_w, out_h, fps, enc, focus,
-                               timecode_from=t if proxy else None, font=font, backdrop=backdrop)
+                               timecode_from=t if proxy else None, font=font, backdrop=backdrop, panel=panel)
                 d = duration_of(seg)
                 timeline_clips.append({"src": c["src"], "src_in": round(a, 3), "src_out": round(b, 3),
                                        "at": round(t, 3), "duration": round(d, 3), "focus": [round(focus[0], 3), round(focus[1], 3)],
