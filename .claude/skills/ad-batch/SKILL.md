@@ -160,4 +160,4 @@ Write `brief/10_launch.md` per `reference/launch.md`: structure, budget sanity c
 
 ## Naming convention
 
-`{market}_{offer}_{angle}_{hooktype}_{length}s_{ratio}_v{n}.mp4`, e.g. `HSV_reviews_lostjobs_question_30s_9x16_v1.mp4`. Each part uses letters, digits, and hyphens only (no underscores inside a part), so `tools/metrics.py` can group results by angle, hook type, length, and ratio. Use the same name for the ad in Ads Manager.
+`{market}_{offer}_{price}_{angle}_{hooktype}_{length}s_{ratio}_v{n}.mp4`, e.g. `HSV_reviews_497_lostjobs_question_30s_9x16_v1.mp4`. Price sits third, right after the offer, so files sort by it early: `497`, `free`, `0down`, or `noprice` when the ad states no price (Bruce, 2026-11-17). Each part uses letters, digits, and hyphens only (no underscores inside a part), so `tools/metrics.py` can group results by price, angle, hook type, length, and ratio, and `tools/deliver.py` can sort upload folders by market, offer and price. Use the same name for the ad in Ads Manager.

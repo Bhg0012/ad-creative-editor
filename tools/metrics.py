@@ -40,8 +40,8 @@ ALIASES = {
     "date": ["date", "day", "datestart", "reportingstarts", "daystart"],
 }
 MIN_IMPRESSIONS = 1000  # below this, rates are too noisy to read
-NAME_RE = re.compile(r"^(?P<market>[^_]+)_(?P<offer>[^_]+)_(?P<angle>[^_]+)_(?P<hooktype>[^_]+)_"
-                     r"(?P<length>\d+)s_(?P<ratio>[^_]+)_v(?P<version>\d+)")
+NAME_RE = re.compile(r"^(?P<market>[A-Za-z0-9-]+)_(?P<offer>[A-Za-z0-9-]+)_(?:(?P<price>[A-Za-z0-9-]+)_)?(?P<angle>[A-Za-z0-9-]+)_"
+                     r"(?P<hooktype>[A-Za-z0-9-]+)_(?P<length>\d+)s_(?P<ratio>\d+x\d+)_v(?P<version>\d+)")
 
 
 def norm(s: str) -> str:
@@ -193,9 +193,10 @@ def by_convention(g: pd.DataFrame) -> dict[str, pd.DataFrame]:
     if parts.isna().all().all():
         return {}
     d = pd.concat([g, parts], axis=1).dropna(subset=["angle"])
+    d["price"] = d["price"].fillna("noprice")
     out = {}
     cols = [c for c in ("spend", "impressions", "plays_3s", "thruplays", "link_clicks", "leads") if c in d]
-    for dim in ("angle", "hooktype", "length", "ratio"):
+    for dim in ("price", "angle", "hooktype", "length", "ratio"):
         s = d.groupby(dim)[cols].sum()
         s["ads"] = d.groupby(dim).size()
         if "plays_3s" in s:

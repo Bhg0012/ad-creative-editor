@@ -91,6 +91,12 @@ def spec_checks(path: Path, info: dict) -> tuple[list[dict], dict]:
             res.append(check("audio bitrate", "WARN", "not reported; encode with -b:a 192k"))
     size = path.stat().st_size
     res.append(check("file size", "PASS" if size < MAX_BYTES else "FAIL", f"{size/1e6:.1f} MB"))
+    from common import parse_ad_name  # noqa: WPS433
+
+    np_ = parse_ad_name(path.stem)
+    res.append(check("name follows the convention", "PASS" if np_ and np_["has_price"] else "WARN",
+                     "market_offer_price_angle_hooktype_Ns_ratio_vN" if np_ and np_["has_price"] else
+                     ("missing the price part (use noprice when the ad states no price)" if np_ else "does not parse; see the naming convention in the ad-batch skill")))
     m = re.search(r"_(\d+)s_", path.name)
     if m:
         target = int(m.group(1))
