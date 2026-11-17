@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import os
 import shutil
 import subprocess
@@ -36,6 +37,31 @@ RESOLUTIONS = {
     "1:1": [(1440, 1440), (1080, 1080)],
     "16:9": [(2560, 1440), (1920, 1080)],
 }
+
+
+# Ad naming convention: {market}_{offer}_{price}_{angle}_{hooktype}_{length}s_{ratio}_v{n}
+# e.g. HSV_reviews_497_lostjobs_question_30s_9x16_v1. Price is a first-class part (497, free, 0down,
+# noprice when the ad states no price) so files sort by it early. Legacy 7-part names (no price) still
+# parse, with price reported as "noprice" and has_price False.
+AD_NAME_RE = re.compile(r"^(?P<market>[A-Za-z0-9-]+)_(?P<offer>[A-Za-z0-9-]+)_(?:(?P<price>[A-Za-z0-9-]+)_)?"
+                        r"(?P<angle>[A-Za-z0-9-]+)_(?P<hooktype>[A-Za-z0-9-]+)_(?P<length>\d+)s_(?P<ratio>\d+x\d+)_v(?P<version>\d+)$")
+AD_NAME_PARTS = ("market", "offer", "price", "angle", "hooktype", "length", "ratio", "version")
+
+
+def parse_ad_name(name: str) -> dict | None:
+    """Parts of an ad name, or None when it does not follow the convention."""
+    m = AD_NAME_RE.match(name)
+    if not m:
+        return None
+    d = m.groupdict()
+    d["has_price"] = d["price"] is not None
+    d["price"] = d["price"] or "noprice"
+    return d
+
+
+def format_ad_name(parts: dict) -> str:
+    return (f"{parts['market']}_{parts['offer']}_{parts.get('price') or 'noprice'}_{parts['angle']}_{parts['hooktype']}_"
+            f"{parts['length']}s_{parts['ratio']}_v{parts['version']}")
 
 
 def find_tool(name: str) -> str | None:

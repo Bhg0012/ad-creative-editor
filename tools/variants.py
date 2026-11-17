@@ -16,23 +16,23 @@ dimension values becomes its own EDL (and its own ad name) by patching the base:
           hook_text: "Auburn roofers: 9 reviews?"
           slots: {hook: {src: raw/hook_aub.mov, in: 1.0, out: 4.2}}
           end_card: {subtext: "Auburn-Opelika contractors"}
-      offer:
-        reviews497:
+      price:                       # also a naming part: the ad is named ..._497_... or ..._free_...
+        497:
           slots: {offer: {src: raw/offer_497.mov, in: 10.2, out: 15.0}}
           callouts: [{text: "$497 setup (example)", at: 12.0, duration: 2.0, accent: true}]
-        freesetup:
+        free:
           slots: {offer: {src: raw/offer_free.mov, in: 3.3, out: 8.1}}
           remove: [callouts]
     only:                          # optional: render just these combinations
-      - {market: HSV, offer: reviews497}
+      - {market: HSV, price: 497}
     skip:                          # optional: never render these
-      - {market: AUB, offer: freesetup}
+      - {market: AUB, price: free}
 
 Patch rules: `slots` replaces fields of the clip(s) whose `slot` matches; `clips` replaces the
 whole clip list; `remove` deletes keys; dicts merge, everything else is replaced. Dimension
-names that are naming-convention parts (market, offer, angle, hooktype, length) rename that
-part; any other dimension is appended to the angle part (e.g. lostjobs-price497) so
-tools/metrics.py can still group results.
+names that are naming-convention parts (market, offer, price, angle, hooktype, length) rename
+that part; any other dimension (cta, length-of-hook) is appended to the angle part (e.g.
+lostjobs-textus) so tools/metrics.py can still group results.
 
 Usage:
     .venv/bin/python tools/variants.py work/edl/<base>.variants.yaml              # write EDLs + MATRIX.md
@@ -51,11 +51,9 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import load_yaml  # noqa: E402
+from common import format_ad_name, load_yaml, parse_ad_name  # noqa: E402
 
-NAME_RE = re.compile(r"^(?P<market>[^_]+)_(?P<offer>[^_]+)_(?P<angle>[^_]+)_(?P<hooktype>[^_]+)_"
-                     r"(?P<length>\d+)s_(?P<ratio>[^_]+)_v(?P<version>\d+)$")
-NAME_PARTS = ("market", "offer", "angle", "hooktype", "length")
+NAME_PARTS = ("market", "offer", "price", "angle", "hooktype", "length")
 PART_RE = re.compile(r"^[A-Za-z0-9-]+$")
 
 
@@ -80,11 +78,10 @@ def deep_merge(base: dict, patch: dict) -> dict:
 
 
 def variant_name(base_name: str, combo: dict[str, str]) -> str:
-    m = NAME_RE.match(base_name)
-    if not m:
+    parts = parse_ad_name(base_name)
+    if not parts:
         raise SystemExit(f"base name {base_name!r} does not follow the naming convention "
-                         "{market}_{offer}_{angle}_{hooktype}_{length}s_{ratio}_v{n}")
-    parts = m.groupdict()
+                         "{market}_{offer}_{price}_{angle}_{hooktype}_{length}s_{ratio}_v{n}")
     for dim, value in combo.items():
         if not PART_RE.match(value):
             raise SystemExit(f"variant value {value!r}: letters, digits and hyphens only")
@@ -92,7 +89,7 @@ def variant_name(base_name: str, combo: dict[str, str]) -> str:
             parts[dim] = value
         else:
             parts["angle"] = f"{parts['angle']}-{value}"
-    return f"{parts['market']}_{parts['offer']}_{parts['angle']}_{parts['hooktype']}_{parts['length']}s_{parts['ratio']}_v{parts['version']}"
+    return format_ad_name(parts)
 
 
 def combos(spec: dict) -> list[dict[str, str]]:

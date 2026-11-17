@@ -105,7 +105,7 @@ def main() -> int:
     ap.add_argument("--transcripts", required=True)
     ap.add_argument("--out", required=True, help="selects markdown")
     ap.add_argument("--edl", help="write a draft EDL yaml here")
-    ap.add_argument("--name", default="DRAFT_offer_angle_hook_30s_9x16_v1", help="ad name for the draft EDL")
+    ap.add_argument("--name", default="DRAFT_offer_noprice_angle_hook_30s_9x16_v1", help="ad name for the draft EDL")
     ap.add_argument("--raw", default=str(ROOT / "raw"))
     args = ap.parse_args()
     lines = script_lines(Path(args.script))

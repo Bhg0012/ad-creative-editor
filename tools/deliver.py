@@ -2,35 +2,34 @@
 folder walk, not a guessing game.
 
 Reads batches/<id>/exports/*.mp4 (and statics/*.png) whose names follow the convention
-    {market}_{offer}_{angle}_{hooktype}_{length}s_{ratio}_v{n}
+    {market}_{offer}_{price}_{angle}_{hooktype}_{length}s_{ratio}_v{n}
 and copies each into
-    batches/<id>/deliver/<market>/<offer>/<ratio>/<name>.mp4
-plus deliver/MANIFEST.csv with one row per file: name, market, offer, angle, hook type, length,
+    batches/<id>/deliver/<market>/<offer>/<price>/<ratio>/<name>.mp4
+plus deliver/MANIFEST.csv with one row per file: name, market, offer, price, angle, hook type, length,
 ratio, version, duration, size, and the ad copy file if one exists. Use the same name as the ad
 name in Ads Manager; tools/metrics.py groups results by these parts later.
 
 Usage:
     .venv/bin/python tools/deliver.py batches/<id>
-    .venv/bin/python tools/deliver.py batches/<id> --by ratio      # deliver/<ratio>/<market>/<offer>/
+    .venv/bin/python tools/deliver.py batches/<id> --by ratio      # deliver/<ratio>/<market>/<offer>/<price>/
 """
 from __future__ import annotations
 
 import argparse
 import csv
-import re
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import probe  # noqa: E402
-
-NAME = re.compile(r"^(?P<market>[A-Za-z0-9-]+)_(?P<offer>[A-Za-z0-9-]+)_(?P<angle>[A-Za-z0-9-]+)_(?P<hooktype>[A-Za-z0-9-]+)_(?P<length>\d+)s_(?P<ratio>\d+x\d+)_v(?P<version>\d+)$")
+from common import parse_ad_name, probe  # noqa: E402
 
 
 def parse_name(stem: str) -> dict | None:
-    m = NAME.match(stem)
-    return m.groupdict() if m else None
+    d = parse_ad_name(stem)
+    if d:
+        d.pop("has_price", None)
+    return d
 
 
 def deliver(batch: Path, by: str = "market") -> list[dict]:
@@ -42,9 +41,9 @@ def deliver(batch: Path, by: str = "market") -> list[dict]:
         if not parts:
             print(f"skip (name not in convention): {f.name}")
             continue
-        order = {"market": [parts["market"], parts["offer"], parts["ratio"]],
-                 "ratio": [parts["ratio"], parts["market"], parts["offer"]],
-                 "offer": [parts["offer"], parts["market"], parts["ratio"]]}[by]
+        order = {"market": [parts["market"], parts["offer"], parts["price"], parts["ratio"]],
+                 "ratio": [parts["ratio"], parts["market"], parts["offer"], parts["price"]],
+                 "offer": [parts["offer"], parts["price"], parts["market"], parts["ratio"]]}[by]
         dst = out.joinpath(*order) / f.name
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(f, dst)
@@ -59,7 +58,7 @@ def deliver(batch: Path, by: str = "market") -> list[dict]:
                      "file": str(dst.relative_to(batch)), "copy": str(copy_md.relative_to(batch)) if copy_md.exists() else ""})
     out.mkdir(parents=True, exist_ok=True)
     with open(out / "MANIFEST.csv", "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["name", "market", "offer", "angle", "hooktype", "length", "ratio", "version", "duration_s", "size_mb", "file", "copy"])
+        w = csv.DictWriter(fh, fieldnames=["name", "market", "offer", "price", "angle", "hooktype", "length", "ratio", "version", "duration_s", "size_mb", "file", "copy"])
         w.writeheader()
         w.writerows(rows)
     return rows

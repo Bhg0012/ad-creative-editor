@@ -2,6 +2,10 @@
 
 AI edits drift toward "busy and generic". These rules pull every ad toward one clean, high-contrast, phone-native look that converts for local trade owners. Sources: the 2026 caption and creative research in `docs/`, Meta's Reels safe zone, and the open-source Claude Code editors reviewed there (video-use, claude-shorts, ghost-editor, HyperFrames caption blocks). Where a rule has no data behind it, it is marked "house".
 
+## Safe zones first (Bruce's standing rule, 2026-11-17)
+
+About 95% of the audience watches on a phone, on Facebook and Instagram Reels, where the app's own buttons, caption and profile bar sit on top of the video. Every graphic, caption, headline and CTA lives inside the clear area (9:16: top 14%, bottom 35%, 6% each side; `playbook/facts.yaml` `reels_safe_zone`). The engine places things there by construction and QA fails anything that crosses the line. This matters most on ads; a pre-sale or long-form video after the click can be looser (16:9 has its own lighter zone).
+
 ## One look per batch
 
 - Native, not produced: phone footage, natural light, real locations (truck, job site, office, kitchen table). No stock, no gradients behind the speaker, no stock-style icons.

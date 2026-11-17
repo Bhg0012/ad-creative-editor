@@ -193,7 +193,7 @@ def test_metrics_rates_and_verdicts():
     assert r.loc["HSV_reviews_founder_story_15s_9x16_v1", "verdict"] == "kill candidate"
     assert r.loc["HSV_reviews_demo_demo_30s_4x5_v1", "verdict"] == "too early"
     groups = metrics.by_convention(g)
-    assert set(groups) == {"angle", "hooktype", "length", "ratio"}
+    assert set(groups) == {"price", "angle", "hooktype", "length", "ratio"} and groups["price"]["price"].tolist() == ["noprice"]
 
 
 def test_metrics_requires_core_columns():
@@ -504,8 +504,8 @@ skip:
 """)
     rows = variants.materialize(spec)
     names = [r["name"] for r in rows]
-    assert names == ["HSV_reviews_lostjobs-p497_question_10s_9x16_v1", "HSV_reviews_lostjobs-free_question_10s_9x16_v1",
-                     "AUB_reviews_lostjobs-p497_question_10s_9x16_v1"]
+    assert names == ["HSV_reviews_p497_lostjobs_question_10s_9x16_v1", "HSV_reviews_free_lostjobs_question_10s_9x16_v1",
+                     "AUB_reviews_p497_lostjobs_question_10s_9x16_v1"]
     aub = common.load_yaml(rows[2]["path"])
     assert aub["hook_text"] == "Auburn roofers?" and aub["clips"][0]["in"] == 3.0 and aub["end_card"]["subtext"] == "Auburn"
     assert aub["clips"][1]["in"] == 1.0 and aub["callouts"][0]["text"].startswith("$497")
@@ -513,7 +513,7 @@ skip:
     assert "lower_third" not in free and "callouts" not in free
     assert (spec.parent / "variants" / "MATRIX.md").read_text().count("| HSV_") == 2
     out = render.render(rows[2]["path"], "9:16", None, proxy=True, keep_tmp=False, out_dir=None)
-    assert out.name.startswith("AUB_reviews_lostjobs-p497")
+    assert out.name.startswith("AUB_reviews_p497_lostjobs")
     with pytest.raises(SystemExit):
         variants.deep_merge({"clips": [{"slot": "hook"}]}, {"slots": {"nope": {}}})
 
@@ -994,14 +994,18 @@ def test_takes_export_and_deliver_folders(footage):
     if edl.exists():
         clips = takes.export_edl_clips(edl, out / "P")
         assert len(clips) == 1 and clips[0].name.startswith("P_offer_angle_hook_5s_9x16_v1_clip01_landscape")
-    assert deliver.parse_name("HSV_reviews_lostjobs_question_30s_9x16_v1") == {"market": "HSV", "offer": "reviews", "angle": "lostjobs", "hooktype": "question", "length": "30", "ratio": "9x16", "version": "1"}
+    assert deliver.parse_name("HSV_reviews_497_lostjobs_question_30s_9x16_v1") == {"market": "HSV", "offer": "reviews", "price": "497", "angle": "lostjobs", "hooktype": "question", "length": "30", "ratio": "9x16", "version": "1"}
+    legacy = common.parse_ad_name("HSV_reviews_lostjobs_question_30s_9x16_v1")
+    assert legacy["price"] == "noprice" and legacy["has_price"] is False and legacy["angle"] == "lostjobs"
+    assert common.format_ad_name(legacy) == "HSV_reviews_noprice_lostjobs_question_30s_9x16_v1"
     assert deliver.parse_name("not_a_name") is None
     (footage / "exports").mkdir(exist_ok=True)
     import shutil
-    shutil.copy2(footage / "raw" / "portrait.mp4", footage / "exports" / "TEST_offer_angle_question_10s_9x16_v9.mp4")
+    shutil.copy2(footage / "raw" / "portrait.mp4", footage / "exports" / "TEST_offer_497_angle_question_10s_9x16_v9.mp4")
     (footage / "exports" / "not_a_name.mp4").write_bytes(b"")
     rows = deliver.deliver(footage, "market")
     assert rows and all((footage / r["file"]).exists() for r in rows) and all(r["name"] != "not_a_name" for r in rows)
     assert (footage / "deliver" / "MANIFEST.csv").exists()
     assert any(r["ratio"] == "9x16" and r["market"] == "TEST" for r in rows)
-    assert all(str(Path(r["file"]).parts[1]) == r["market"] for r in rows)
+    assert all(str(Path(r["file"]).parts[1]) == r["market"] and str(Path(r["file"]).parts[3]) == r["price"] for r in rows)
+    assert any(r["price"] == "497" for r in rows)
