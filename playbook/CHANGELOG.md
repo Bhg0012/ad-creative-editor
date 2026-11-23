@@ -27,5 +27,12 @@ Verified all facts in `facts.yaml` against live sources. Corrections to the orig
 - **New rules:** audit Advantage+ creative enhancements before publishing, disclose AI content, use Meta Sound Collection or ad-licensed music only, and send CRM lead-quality signals back to Meta (Conversion Leads).
 - **Mac tooling:** Homebrew's `ffmpeg` formula was slimmed in January 2026 and no longer includes libass/freetype, so captions and drawtext fail. Use `ffmpeg-full` instead (handled by `tools/setup_mac.sh`).
 
+## 2026-11-23: November news refresh
+
+- Retired `meta_news_2026_10` (expired 2026-11-21); its October items are summarized in the notes of the new fact.
+- Added `meta_news_2026_11` (confidence low, four third-party roundups, not yet confirmed on Meta's pages): per-creative reporting in Ads Manager, Advantage+ Creative Image Animation and Muse Image, enforced minimum budgets at publish, per-creative age and gender with Advantage+ Audience off, on-device Pixel matching on by default, Marketing API v24.0 retired, and a disputed Nov 20 Commercial Terms change on AI-generated creative.
+- Lead ads and AI-disclosure searches found nothing new dated November 2026; `conversion_leads` and `ai_content_disclosure` left as they were (within shelf life).
+- No rule or tool changed. Launch plan note: confirm the minimum budget per objective before publishing a small test.
+
 ## 2026-11-11
 - `reels_safe_zone`: re-checked against current secondary guides (14/35/6 unchanged). Added the 40% bottom rule for ads with a disclaimer and the Ads Manager safe zone guardrail preview as the final check. Noted Bruce's audience is about 95% mobile Reels.

@@ -8,6 +8,7 @@ Write to `brief/10_launch.md`. Check every point against `playbook/facts.yaml` f
 - Advantage+ placements unless the data says otherwise.
 - All the batch's ads in that one ad set so delivery can pick winners. Upload all ads at once so they share one learning period (playbook `learning_phase`).
 - Ad names in Ads Manager exactly match the export filenames (naming convention) so `tools/metrics.py` can group results.
+- Budget clears the minimum Ads Manager enforces at publish for the objective and country (reported Nov 2026, playbook `meta_news_2026_11`); a too-small test campaign is refused, not warned.
 
 ## Budget sanity check
 
