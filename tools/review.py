@@ -28,13 +28,26 @@ textarea{width:100%;min-height:90px;background:#161a22;color:#e8eaf0;border:1px 
 button{background:#3B96F6;color:#fff;border:0;border-radius:8px;padding:8px 12px;margin-top:6px}
 details{margin:6px 0}summary{cursor:pointer;color:#93c5fd}pre{white-space:pre-wrap;font-size:12px;background:#161a22;padding:8px;border-radius:8px}
 .chip{display:inline-block;background:#1f2532;border-radius:999px;padding:2px 10px;font-size:12px;margin:2px}
+.seek{display:inline-block;background:#1e3a5f;color:#cfe3ff;border-radius:999px;padding:2px 9px;font-size:12px;margin:2px;cursor:pointer;border:0}
+.marks{min-height:4px;margin:4px 0}
 @media(max-width:700px){.ad{grid-template-columns:1fr}}
 """
 JS = """
 function copyNotes(){const out=[];document.querySelectorAll('textarea').forEach(t=>{if(t.value.trim())out.push('## '+t.dataset.ad+'\\n'+t.value.trim())});
 const txt=out.join('\\n\\n')||'(no notes)';navigator.clipboard.writeText(txt).then(()=>alert('Notes copied. Paste them into the chat.'));}
 function stamp(btn){const sec=btn.closest('section');const v=sec.querySelector('video');const t=sec.querySelector('textarea');
-const s=v.currentTime;const m=Math.floor(s/60),ss=(s%60).toFixed(1).padStart(4,'0');t.value=(t.value?t.value.replace(/\\s*$/,'')+'\\n':'')+m+':'+ss+'  ';t.focus();}
+const s=v.currentTime;const m=Math.floor(s/60),ss=(s%60).toFixed(1).padStart(4,'0');t.value=(t.value?t.value.replace(/\\s*$/,'')+'\\n':'')+m+':'+ss+'  ';t.focus();save(t);}
+// Notes survive a reload (stored in this browser only) and every timestamp becomes a click-to-seek chip.
+function key(t){return 'review:'+document.title+':'+t.dataset.ad;}
+function save(t){try{localStorage.setItem(key(t),t.value);}catch(e){}marks(t);}
+function marks(t){const box=t.parentElement.querySelector('.marks');if(!box)return;box.innerHTML='';
+const re=/(\\d+):(\\d{1,2}(?:\\.\\d)?)/g;let m;const seen=new Set();
+while((m=re.exec(t.value))){const sec=parseInt(m[1])*60+parseFloat(m[2]);if(seen.has(sec))continue;seen.add(sec);
+const b=document.createElement('button');b.className='seek';b.textContent=m[0];b.title='jump to '+m[0];
+b.onclick=()=>{const v=t.closest('section').querySelector('video');v.currentTime=sec;v.play();};box.appendChild(b);}}
+function downloadNotes(){const out=['# Review notes','',document.title,''];document.querySelectorAll('textarea').forEach(t=>{if(t.value.trim())out.push('## '+t.dataset.ad,'',t.value.trim(),'')});
+const blob=new Blob([out.join('\\n')],{type:'text/markdown'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='review_notes.md';a.click();}
+document.querySelectorAll('textarea').forEach(t=>{try{const v=localStorage.getItem(key(t));if(v)t.value=v;}catch(e){}marks(t);t.addEventListener('input',()=>save(t));});
 """
 
 
@@ -63,8 +76,8 @@ def build(batch: Path) -> Path:
     parts = [f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
              f"<title>Review {html.escape(batch.name)}</title><style>{CSS}</style></head><body>",
              f"<header><h1>{html.escape(batch.name)}</h1><div>{len(exports)} finals, {len(proxies)} proxies, {len(statics)} statics. "
-             f"Generated {dt.datetime.now():%Y-%m-%d %H:%M}. Write notes under each ad, then tap Copy all notes.</div>"
-             f"<button onclick='copyNotes()'>Copy all notes</button></header>"]
+             f"Generated {dt.datetime.now():%Y-%m-%d %H:%M}. Write notes under each ad (they are kept if you reload), then tap Copy all notes or Download notes.</div>"
+             f"<button onclick='copyNotes()'>Copy all notes</button> <button onclick='downloadNotes()'>Download notes</button></header>"]
     for group, files in (("Finals", exports), ("Proxies (rough cuts)", proxies)):
         if not files:
             continue
@@ -105,7 +118,7 @@ def build(batch: Path) -> Path:
             if copy_md.exists():
                 parts.append("<details><summary>Copy package</summary><pre>" + html.escape(copy_md.read_text()) + "</pre></details>")
             parts.append(f"<textarea data-ad='{html.escape(f.name)}' placeholder='Notes for this ad. Pause the video and tap Stamp time to insert the timecode.'></textarea>"
-                         f"<button onclick='stamp(this)'>Stamp time</button></div></section>")
+                         f"<div class='marks'></div><button onclick='stamp(this)'>Stamp time</button></div></section>")
     if statics:
         parts.append("<h2 style='padding:16px 20px 0'>Statics</h2><div style='display:flex;flex-wrap:wrap;gap:12px;padding:20px'>")
         for s in statics:

@@ -52,7 +52,7 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/inventory.py` | ffprobe every file in `raw/` (rotation, VFR, HDR, resolution flags) and per-clip contact sheets |
 | `tools/transcribe.py` | Word-level transcripts (mlx-whisper, WhisperX, or faster-whisper, whichever is installed); `--split` transcribes each pause-separated take on its own |
 | `tools/selects.py` | Best take per script line from the transcripts, plus a draft EDL |
-| `tools/render.py` | EDL (yaml) to finished ad: reframe to 9:16, 4:5 or 16:9 around the face, punch-ins, zoom punches, pause tightening, split layout (speaker band plus graphics stage), B-roll, plates, hook text, lower third, ducked music, SFX, end card, two-pass loudness, captions mapped from the source transcripts (`--captions source`). `--proxy` for rough cuts, `--storyboard` for a contact sheet of every graphic |
+| `tools/render.py` | EDL (yaml) to finished ad: reframe to 9:16, 4:5 or 16:9 around the face, punch-ins, zoom punches, pause tightening, split layout (speaker band plus graphics stage), B-roll, plates, hook text, lower third, ducked music, SFX, end card, two-pass loudness, captions mapped from the source transcripts (`--captions source`), cut edges snapped to the waveform, equal-power audio crossfades at every cut, music sections set relative to the voice, cached graphics. `--proxy` for rough cuts, `--storyboard` for a contact sheet of every graphic |
 | `tools/plates.py` | Motion plates: browser-rendered graphics (hook card, callouts, stat, compare, card, step, grid, before/after, chips, frame label, takeover, strike, progress bar, backdrop, words, toast, fan, steps, timer, quote, files, tracks, phone and browser frames, pip, lower third, end card, word-by-word captions) from one design system in `tools/plates/` |
 | `tools/capture.py` | Screenshots or scroll-through videos of web pages (your site, a Google Business Profile) as B-roll |
 | `tools/pipeline.py` | The assembly line: one command runs inventory, transcription, storyboard, render, source captions, other ratios, QA, copy lint and the review page in order with a ticked checklist |
@@ -65,13 +65,13 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/reference.py` | Measure a reference ad (cuts, change events per second by hook/body/CTA, loudness, music bed, contact sheet, frames) into a `.analysis.md` so its style can be copied as numbers |
 | `tools/sfx.py` | Synthesized default sound effects (pop, click, whoosh, ding, riser) until licensed ones are in `audio/sfx/` |
 | `tools/captions.py` | Caption file (.ass) from a transcript, the fast fallback engine: chunk, highlight, karaoke, reveal, or hormozi style |
-| `tools/statics.py` | Static image ads (4:5, 9:16) from a photo or a frame, headline + CTA inside the safe zone |
+| `tools/statics.py` | Static image ads (4:5, 9:16): the photo + headline layout, or `--template` headliner, problem, question, mythbuster, versus, listicle, howitworks, quote, postit, letter, lofi (same design system and safe zone as the video graphics) |
 | `tools/variants.py` | Single-variable versions of a hero ad (market, offer, hook, CTA) from one variants file; writes every EDL and a MATRIX.md |
-| `tools/review.py` | One-page local review site per batch (players, timelines, captions, QA, notes box) |
+| `tools/review.py` | One-page local review site per batch (players, timelines, captions, QA, notes that survive a reload, click-to-seek timestamps, Download notes) |
 | `tools/make_sample.py` | Builds a sample ad from stand-in clips (your Mac's own voice, placeholder visuals) and runs the whole pipeline, so you can see it work before filming |
-| `tools/lint_copy.py` | Lints copy files, EDL texts and captions for em dashes, jargon, personal-attribute wording, unproven claims, fake urgency, unlabeled numbers, and length limits |
-| `tools/qa.py` | Spec, loudness, black-frame, silent-open, opening-similarity, caption geometry, headline, face, duration and script-match checks plus evidence images |
-| `tools/metrics.py` | Hook rate, hold rate, CTR, CPL, verdicts, grouping by angle / hook / length / ratio, and 7-day fatigue reads; reads CSV or a Meta Ads MCP JSON pull |
+| `tools/lint_copy.py` | Lints copy files, EDL texts and captions for em dashes, jargon, personal-attribute wording, unproven claims, fake urgency, unlabeled numbers, length limits, and AI-isms; also lints the script |
+| `tools/qa.py` | Spec, loudness, black-frame, silent-open, opening-similarity, caption geometry, headline, face, duration and script-match checks, cuts inside speech, pacing, sound-effect density, A/V length, plus evidence images; `--review-pack` builds frame strips, a loudness curve and seam levels for a fresh-eyes review |
+| `tools/metrics.py` | Hook rate, hold rate, CTR, CPL, verdicts, grouping by angle / hook / length / ratio, 7-day fatigue reads, retention quartiles mapped to what was on screen, cost per qualified lead, and a small-budget fair test (`--impression-cap`); reads CSV or a Meta Ads MCP JSON pull |
 
 Run the tests with `.venv/bin/python -m pytest -q`.
 

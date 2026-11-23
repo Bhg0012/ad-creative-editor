@@ -27,6 +27,14 @@ Verified all facts in `facts.yaml` against live sources. Corrections to the orig
 - **New rules:** audit Advantage+ creative enhancements before publishing, disclose AI content, use Meta Sound Collection or ad-licensed music only, and send CRM lead-quality signals back to Meta (Conversion Leads).
 - **Mac tooling:** Homebrew's `ffmpeg` formula was slimmed in January 2026 and no longer includes libass/freetype, so captions and drawtext fail. Use `ffmpeg-full` instead (handled by `tools/setup_mac.sh`).
 
+## 2026-11-23: training pass, 20 YouTube videos (post-Andromeda creative, gurus, AI editors)
+
+Source: `docs/training/meta_ad_creative_training_transcripts.md` (kept local, not in git), read in full in three parts; every adopted rule is credited by video in the reference docs.
+- Added `instant_form_disqualify` (low; Ben Heath), `small_budget_fair_test` (low; Sergio C), `protect_working_campaign` (medium; Professor Charley T, Sergio C), `evaluation_window` (medium; Sabri Suby, Charley T), `flexible_ad_322` (low; Charley T).
+- Notes added to `creative_similarity` (creative is the targeting: Suby, Cordeddu, Sergio C), `reels_video_specs` (lead-in is the first 7-8 words on Reels), `creatives_per_adset` (Hormozi via Ben Heath says no cap; Charley T's small-account fallback agrees with 4-8; keep 4-8), `creative_fatigue` (frequency never alone; refresh order).
+- Rules changed as a result: launch.md (7-day kill window, account-wide step 0, small-budget fair test, batch 2+ side tests, budget step gate, form disqualification), copy-package.md, angles-and-hooks.md, visual-style.md, scripts-and-editing.md, edit-checklist.md, both skills.
+- Rejected (do not transfer to a small local lead-gen account, or break compliance): partnership-ad spend targets, zombie campaigns, phantom unbranded pages, faked street interviews, AI investigation ads, press logos, price anchors and BOGO, 20-40 headlines per ad, ROAS scorecards, interest stacking.
+
 ## 2026-11-23: November news refresh
 
 - Retired `meta_news_2026_10` (expired 2026-11-21); its October items are summarized in the notes of the new fact.

@@ -23,6 +23,7 @@ Plate types:
     files        grid of document icons with a badge letter, label and sub line
     tracks       rows of labelled blocks (timeline or schedule) with a bright window and share label
     bezel        phone or browser frame drawn around a video inset ffmpeg placed
+    post         a generic text-post card on screen from frame 1 (no platform branding), as a video's opening frame
     toast        small white notice card with an optional title and dot
 
 Usage:
@@ -50,13 +51,13 @@ SIZES = {  # font size as a fraction of frame height
     "lower_third": 0.034, "hook": 0.046, "endcard": 0.056, "captions": 0.044,
     "step": 0.04, "grid": 0.05, "before_after": 0.08, "chips": 0.042, "frame_label": 0.026,
     "takeover": 0.14, "strike": 0.046, "progress": 0.0, "backdrop": 0.0, "words": 0.075, "toast": 0.03,
-    "fan": 0.03, "steps": 0.03, "timer": 0.06, "quote": 0.034, "files": 0.024, "tracks": 0.026, "bezel": 0.0,
+    "fan": 0.03, "steps": 0.03, "timer": 0.06, "quote": 0.034, "files": 0.024, "tracks": 0.026, "bezel": 0.0, "post": 0.04,
 }
 ENTRANCE_SFX = {"label": "pop", "stat": "ding", "compare": "pop", "card": "pop", "pip": "pop",
                 "lower_third": "click", "hook": None, "endcard": "riser", "captions": None,
                 "step": "click", "grid": "pop", "before_after": "thud", "chips": "click", "frame_label": "click",
                 "takeover": "thud", "strike": "pop", "progress": None, "backdrop": None, "words": "click", "toast": "pop",
-                "fan": "swipe", "steps": "click", "timer": "click", "quote": "pop", "files": "pop", "tracks": "click", "bezel": None}
+                "fan": "swipe", "steps": "click", "timer": "click", "quote": "pop", "files": "pop", "tracks": "click", "bezel": None, "post": None}
 REGION = {"top": "top", "center": "center", "lower": "lower"}
 PAPER_BG = "#f3f0ea"    # cream dotted-grid sheet (reference 4)
 PAPER_INK = "#4a1c1c"   # the deep maroon type on it
@@ -325,6 +326,11 @@ def build_html(spec: dict, width: int, height: int, cfg: dict) -> str:
             foot.append(f"<span>{esc(spec['source'])}</span>")
         return fill("quote", {"theme": th, "size": size, "pos": pos or "pos-center", "style": style, "avatar": avatar, "name": esc(name),
                               "when": esc(spec.get("when") or ""), "text": emph(spec.get("text", "")), "foot_html": "".join(foot)})
+    if kind == "post":
+        # A text post as the first frame of a video still stops the scroll (Dara Denney V9). Generic on purpose:
+        # no Reddit, X or Facebook look, a real or clearly labeled post only, and it is on screen from frame 1 (no entrance).
+        q = build_html({**spec, "type": "quote", "size": spec.get("size") or SIZES["post"]}, width, height, cfg)
+        return q.replace("card quote in out center-x", "card quote out center-x")
     if kind == "files":
         colors = (cfg.get("business") or {}).get("brand_colors") or {}
         items = [it if isinstance(it, dict) else {"label": str(it)} for it in (spec.get("items") or [])][:12]

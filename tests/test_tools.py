@@ -1082,3 +1082,123 @@ def test_deliver_copies_to_synced_folder(footage, tmp_path):
     assert deliver.copy_out(footage, target) == dest            # second run copies nothing new, no error
     with pytest.raises(SystemExit):
         deliver.resolve_copy_to(str(tmp_path / "nope-*" / "My Drive"))
+
+
+def _rms_db(path, t, span=0.01):
+    raw = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-ss", f"{max(0, t - span / 2):.3f}", "-t", f"{span:.3f}", "-i", str(path),
+                          "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
+    import numpy as np
+    a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+    return 20 * np.log10(max(float(np.sqrt(np.mean(a ** 2))) if len(a) else 0.0, 1e-6))
+
+
+def test_snap_crossfade_music_sections_and_new_qa(footage):
+    import numpy as np
+    env = np.array([-15.0] * 100 + [-55.0] * 20 + [-15.0] * 80)
+    assert render.snap_edge(env, 0.0, 0.97, "out", 0.08, -40) > 1.0 and render.snap_edge(env, 0.0, 1.23, "in", 0.08, -40) < 1.2
+    assert render.snap_edge(env, 0.0, 0.5, "out", 0.08, -40) == 0.5
+    # a skip inside continuous tone makes a seam with sound on both sides: with the crossfade the level never dips to silence
+    edl = footage / "work" / "edl" / "X_offer_noprice_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("""
+name: X_offer_noprice_angle_hook_5s_9x16_v1
+clips:
+  - {src: raw/landscape.mp4, in: 1.0, out: 3.0, tighten: 0, skip: [[1.8, 1.9]], snap: 0}
+  - {src: raw/landscape.mp4, in: 5.0, out: 6.0, tighten: 0, snap: 0}
+music:
+  - {src: audio/music.mp3, at: 0.0, until: 1.2}
+  - {src: audio/music.mp3, at: 1.2, src_in: 0.5}
+""")
+    final = render.render(edl, None, "source", proxy=False, keep_tmp=False, out_dir=None)
+    sidecar = json.loads((final.parent / (final.stem + ".render.json")).read_text())
+    seam = sidecar["clips"][1]["at"]
+    lows = [_rms_db(final, seam + d) for d in (-0.02, -0.01, 0.0, 0.01, 0.02)]
+    assert min(lows) > -40, lows
+    mus = sidecar["music"]
+    assert len(mus["sections"]) == 2 and mus["under_voice_lu"] == 20 and mus["voice_lufs"] is not None
+    assert sidecar["audio"]["voice_compress"] == "light" and "sfx" in sidecar
+    s = statuses(qa.qa_one(final, footage / "qa", -14, -1.0, review=True))
+    assert s["cut lands in speech"] == "WARN"                     # the skip sits inside the tone on purpose
+    assert s["audio and video same length"] == "PASS" and s["music level relative to the voice"] == "PASS"
+    assert "pacing: a visual change every few seconds" in s
+    pack = footage / "qa" / final.stem / "review_pack"
+    assert (pack / "README.md").exists() and (pack / "seams.json").exists() and list(pack.glob("strip_*.png"))
+    assert (pack / "loudness_curve.csv").read_text().count("\n") > 3
+    # the old fade-to-silence for comparison: config off
+    old = render.seam_audio([{"path": footage / "raw" / "landscape.mp4", "a": 1.0, "dur": 0.5, "at": 0.0, "has_audio": True, "src_dur": 8.0}],
+                            0.5, footage / "work" / "x.wav", 0.02)
+    assert old is True
+
+
+def test_pace_checks_and_sfx_density():
+    sc = {"clips": [{"src": "a", "at": 0.0, "duration": 9.0}, {"src": "end_card", "at": 9.0, "duration": 2.0}],
+          "graphics": [{"type": "label", "at": 0.5, "duration": 2}], "broll": [], "sfx": [{"at": 1.0}, {"at": 1.2}]}
+    s = {c["check"]: c for c in qa.pace_checks(sc, 11.0)}
+    assert s["pacing: a visual change every few seconds"]["status"] == "WARN" and "0.5-9.0s" in s["pacing: a visual change every few seconds"]["detail"]
+    assert s["sound effects not too busy"]["status"] == "WARN"
+    sc["graphics"] += [{"type": "stat", "at": 3.5, "duration": 2}, {"type": "card", "at": 6.5, "duration": 2}]
+    sc["sfx"] = [{"at": 1.0}, {"at": 4.0}]
+    s = {c["check"]: c["status"] for c in qa.pace_checks(sc, 11.0)}
+    assert s["pacing: a visual change every few seconds"] == "PASS" and s["sound effects not too busy"] == "PASS"
+
+
+def test_lint_ai_isms_script_cues_and_batch_template(tmp_path):
+    cfg = common.load_config()
+    assert any("AI-ism" in f["why"] for f in lint_copy.lint_text("It's not just reviews, it's trust.", "x", cfg))
+    assert not any("AI-ism" in f["why"] for f in lint_copy.lint_text("Your phone rings when you show up first.", "x", cfg))
+    b = tmp_path / "b"
+    (b / "brief").mkdir(parents=True)
+    (b / "brief" / "08_scripts.md").write_text("Huntsville roofers, here's the thing. [SCREEN: a real Google profile]\n")
+    found = lint_copy.lint_batch(b, cfg)
+    assert any(f["where"].startswith("08_scripts.md") and "AI-ism" in f["why"] for f in found)
+    assert selects.script_lines(b / "brief" / "08_scripts.md") == ["Huntsville roofers, here's the thing."]
+    assert selects.script_cues(b / "brief" / "08_scripts.md")[0][1:] == ("SCREEN", "a real Google profile")
+    assert "## Session log" in new_batch.TRACKER and "Diagnosis" in new_batch.TRACKER
+    assert "downloadNotes" in review.JS and "localStorage" in review.JS
+
+
+def test_metrics_retention_fair_test_and_qualified(tmp_path):
+    df = pd.DataFrame({"Ad name": ["HSV_reviews_497_a_q_10s_9x16_v1", "HSV_reviews_497_b_q_10s_9x16_v1", "HSV_reviews_497_c_q_10s_9x16_v1"],
+                       "Amount spent (USD)": [60, 60, 10], "Impressions": [2500, 2200, 400], "3-second video plays": [800, 400, 100],
+                       "ThruPlays": [200, 60, 10], "Link clicks": [40, 10, 2], "Leads": [3, 1, 0], "Qualified leads": [2, 0, 0],
+                       "Video plays at 25%": [600, 200, 50], "Video plays at 50%": [500, 120, 30], "Video plays at 75%": [300, 80, 20],
+                       "Video plays at 95%": [250, 60, 10]})
+    g = metrics.diagnose(metrics.compute(df), target_cpl=50)
+    assert g.set_index("ad_name").loc["HSV_reviews_497_a_q_10s_9x16_v1", "cost_per_qualified"] == pytest.approx(30)
+    rd = tmp_path / "exports"
+    rd.mkdir()
+    (rd / "HSV_reviews_497_b_q_10s_9x16_v1.render.json").write_text(json.dumps({
+        "duration": 10.0, "clips": [{"src": "raw/a.mov", "at": 0, "duration": 10, "layout": "full"}],
+        "graphics": [{"type": "compare", "text": "Same work", "at": 0.5, "duration": 3}], "broll": []}))
+    ret = metrics.retention(g, rd).set_index("ad_name")
+    assert ret.loc["HSV_reviews_497_b_q_10s_9x16_v1", "p25"] == pytest.approx(0.5)
+    assert "compare graphic" in ret.loc["HSV_reviews_497_b_q_10s_9x16_v1", "lost_around"]
+    cap = metrics.impression_cap(g, 2000)
+    assert list(cap["ad_name"])[0] == "HSV_reviews_497_a_q_10s_9x16_v1" and len(cap) == 2
+    assert list(cap.attrs["waiting"]["ad_name"]) == ["HSV_reviews_497_c_q_10s_9x16_v1"]
+
+
+def test_static_templates_post_plate_sfx_and_plate_cache(footage, tmp_path):
+    import statics as st
+    import sfx as sfxmod
+    for t in ("headliner", "versus", "listicle", "quote", "lofi"):
+        spec = {"template": t, "headline": "Huntsville roofers: *9 reviews*?", "sub": "example", "cta": "Tap Learn More",
+                "items": ["One", "Two", "Three"], "left": "Asking|You forget", "right": "A text|Same day", "name": "Example only",
+                "image": str(footage / "raw" / "still.png")}
+        out = st.build_template(spec, "4:5", tmp_path / f"{t}.png")
+        from PIL import Image
+        im = Image.open(out)
+        assert im.size == (1440, 1800) and im.mode == "RGB", t
+    with pytest.raises(SystemExit):
+        st.build_template({"template": "lofi", "headline": "x"}, "4:5", tmp_path / "x.png")
+    paths = sfxmod.ensure_defaults(tmp_path / "sfx")
+    assert {"impact", "suckback", "hit"} <= set(paths) and all(p.exists() for p in paths.values())
+    h = plates.build_html({"type": "post", "name": "A roofer", "text": "Why do they get the call?", "duration": 1}, 540, 960, common.load_config())
+    assert "card quote out" in h and "card quote in" not in h
+    cache = footage / "work" / "cache" / "plates"
+    before = len(list(cache.glob("*.mov"))) if cache.exists() else 0
+    edl = footage / "work" / "edl" / "P_offer_angle_hook_5s_9x16_v1.yaml"
+    if edl.exists():
+        render.render(edl, None, None, proxy=False, keep_tmp=False, out_dir=None)
+        mid = len(list(cache.glob("*.mov")))
+        render.render(edl, None, None, proxy=False, keep_tmp=False, out_dir=None)
+        assert len(list(cache.glob("*.mov"))) == mid >= before

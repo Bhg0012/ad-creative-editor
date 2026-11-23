@@ -58,6 +58,10 @@ audio:
   true_peak_max_dbtp: -1.0
   voice_highpass_hz: 80        # rumble cut on the voice track
   voice_denoise: false         # afftdn noise reduction; only if the room is noisy
+  voice_lowpass_hz: 15000      # cut hiss above the voice (the voice lives between about 80 Hz and 12-16 kHz); 0 disables
+  voice_compress: light        # light (2:1 at -20 dB) | medium (2.5:1 at -18 dB) | off, if the voice sounds squashed
+  music_under_voice_lu: 20     # a music section without gain_db sits this many LU under the measured voice
+  music_voice_dip_db: 4        # EQ dip around 2 kHz on the music so it never sits on the voice
 
 graphics:                      # motion plates (tools/plates.py), the browser-rendered graphics layer
   engine: html                 # html = animated cards, callouts, lower third, hook, end card rendered in Chromium; ffmpeg = flat drawtext fallback
@@ -68,6 +72,9 @@ graphics:                      # motion plates (tools/plates.py), the browser-re
 edit:                          # defaults for tools/render.py (what an editor does by reflex; per-clip keys override)
   auto_tighten: 0.45           # shorten every pause longer than this inside a clip; `tighten: 0` on a clip disables
   tighten_keep: 0.12           # seconds of pause left on each side when a pause is tightened
+  snap_cuts: 0.08              # every cut edge moves up to this far to the quietest 10 ms of the waveform, so no word onset or tail is clipped (transcript times drift +/-150 ms)
+  snap_floor_db: -40           # what counts as quiet at a cut edge
+  audio_crossfade: 0.02        # equal-power audio crossfade at every cut (half-width, seconds): room tone never drops to silence between segments; 0 = old fade-to-silence
   auto_alternate_zoom: yes     # consecutive talking-head clips alternate 1.0 and alternate_zoom so jump cuts read as intended
   alternate_zoom: 1.08
   settle_cuts: 1.04            # every cut after the first opens pushed in by this and settles over 0.25 s; `settle: 0` on a clip disables
@@ -104,4 +111,5 @@ batch_defaults:
       offer: no                # different offer or price line (the `offer` slot clip, callout)
       hook: no                 # alternate opening line and shot on the same body (the `hook` slot)
       cta: no                  # different ask or end card text
+      trade: no                # one trade keyword per variant (roofers / HVAC / plumbers) in the hook line, headline and primary text; added to the angle part of the name
     all_ratios: yes            # every variant in every ratio from aspect_ratios
