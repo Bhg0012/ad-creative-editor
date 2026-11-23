@@ -1009,3 +1009,60 @@ def test_takes_export_and_deliver_folders(footage):
     assert any(r["ratio"] == "9x16" and r["market"] == "TEST" for r in rows)
     assert all(str(Path(r["file"]).parts[1]) == r["market"] and str(Path(r["file"]).parts[3]) == r["price"] for r in rows)
     assert any(r["price"] == "497" for r in rows)
+
+
+def test_fillers_skip_ranges_and_caption_drop(footage):
+    import fillers
+    words = [{"word": "Um,", "start": 0.0, "end": 0.3}, {"word": "Huntsville", "start": 0.4, "end": 0.8}, {"word": "roofers", "start": 0.85, "end": 1.2},
+             {"word": "the", "start": 1.25, "end": 1.35}, {"word": "the", "start": 1.4, "end": 1.5}, {"word": "uh", "start": 1.6, "end": 1.8}, {"word": "phone", "start": 1.9, "end": 2.2}]
+    found = fillers.find_fillers(words, repeats=True)
+    assert [(f["word"], f["kind"]) for f in found] == [("Um,", "filler"), ("the", "repeat"), ("uh", "filler")]
+    assert [w["word"] for w in captions.drop_fillers(words)] == ["Huntsville", "roofers", "the", "the", "phone"]
+    assert render.apply_skips([(0.0, 3.0)], [[1.0, 1.2], [2.5, 2.6]]) == [(0.0, 0.97), (1.23, 2.47), (2.63, 3.0)]
+    assert render.apply_skips([(0.0, 3.0)], []) == [(0.0, 3.0)]
+    edl = footage / "work" / "edl" / "F_offer_noprice_angle_hook_5s_9x16_v1.yaml"
+    edl.write_text("name: F_offer_noprice_angle_hook_5s_9x16_v1\nclips:\n  - {src: raw/landscape.mp4, in: 0.0, out: 3.0, tighten: 0}\n  - {src: raw/portrait.mp4, in: 0.0, out: 1.0, tighten: 0}\n")
+    wj = footage / "work" / "transcripts" / "landscape.words.json"
+    n = fillers.apply_to_edl(edl, {"landscape": [{"start": 0.42, "end": 0.80, "word": "roofers,", "kind": "filler"}, {"start": 3.2, "end": 3.5, "word": "x", "kind": "filler"}]})
+    loaded = common.load_yaml(edl)
+    assert n == 1 and loaded["clips"][0]["skip"] == [[0.42, 0.8]] and "skip" not in loaded["clips"][1]
+    tl = render.timeline_of(edl)
+    assert [(c["src_in"], c["src_out"]) for c in tl[:2]] == [(0.0, 0.39), (0.83, 3.0)]
+    proxy = render.render(edl, None, None, proxy=True, keep_tmp=False, out_dir=None)
+    assert 3.4 < float(common.probe(proxy)["format"]["duration"]) < 3.8
+
+
+def test_find_moments_across_transcripts(footage):
+    import find
+    tr = footage / "work" / "transcripts"
+    (tr / "office.words.json").write_text(json.dumps([{"word": w, "start": 0.5 * i, "end": 0.5 * i + 0.4} for i, w in enumerate(
+        "the phone stopped ringing in the slow season and we had no reviews to show".split())]))
+    hits = find.search("slow season no reviews", find.load_transcripts(tr), top=5)
+    assert hits and hits[0]["stem"] == "office" and "slow season" in hits[0]["text"]
+    hits2 = find.search("competitor has 140 reviews", find.load_transcripts(tr), top=3)
+    assert hits2[0]["stem"] == "landscape"
+    out = footage / "work" / "edl" / "HSV_reviews_noprice_pull_story_30s_9x16_v1.yaml"
+    find.write_edl(hits2[:1], out, footage / "raw", out.stem)
+    loaded = common.load_yaml(out)
+    assert loaded["clips"][0]["src"] == "raw/landscape.mp4" and loaded["clips"][0]["out"] > loaded["clips"][0]["in"]
+
+
+def test_export_timeline_formats(footage):
+    import export_timeline
+    sidecars = sorted((footage / "exports").glob("*.render.json"))
+    if not sidecars:
+        edl = footage / "work" / "edl" / "T_offer_noprice_angle_hook_5s_9x16_v1.yaml"
+        edl.write_text("name: T_offer_noprice_angle_hook_5s_9x16_v1\nclips:\n  - {src: raw/landscape.mp4, in: 1.0, out: 2.5, tighten: 0}\nbroll:\n  - {src: raw/broll.mp4, at: 0.3, duration: 0.5, src_in: 1.0}\nend_card: {text: Go, seconds: 1.0}\n")
+        final = render.render(edl, None, str(footage / "work" / "transcripts" / "landscape.words.json"), proxy=False, keep_tmp=False, out_dir=None)
+        sidecars = [final.parent / (final.stem + ".render.json")]
+    sc = sidecars[0]
+    files = export_timeline.export(sc, "all", footage / "exports" / "timelines")
+    assert [f.suffix for f in files] == [".xml", ".fcpxml", ".otio"] and all(f.stat().st_size > 500 for f in files)
+    xml = files[0].read_text()
+    assert "<xmeml" in xml and "landscape.mp4" in xml and "file://" in xml
+    import opentimelineio as otio
+    tl = otio.adapters.read_from_file(str(files[2]))
+    v1 = [t for t in tl.tracks if t.name.startswith("V1")][0]
+    sidecar = json.loads(sc.read_text())
+    assert len([c for c in v1 if isinstance(c, otio.schema.Clip)]) == len([c for c in sidecar["clips"] if c["src"] != "end_card"])
+    assert len(v1.markers) >= len(sidecar["graphics"])

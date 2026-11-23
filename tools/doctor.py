@@ -36,6 +36,7 @@ PY_PACKAGES = [
     ("auto_editor", "auto-editor", False),
     ("jupyter", "jupyter", False),
     ("rembg", "rembg", False),
+    ("opentimelineio", "opentimelineio", True),
 ]
 TRANSCRIBERS = ["mlx_whisper", "whisperx", "faster_whisper", "whisper"]
 

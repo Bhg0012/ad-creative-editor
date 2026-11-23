@@ -48,6 +48,18 @@ def hex_to_bgr(color: str) -> str:
     return (c[4:6] + c[2:4] + c[0:2]).upper()
 
 
+FILLERS = {"um", "uh", "uhm", "umm", "erm", "er", "ah", "hmm", "mm", "mhm", "uhh", "ahh"}
+
+
+def is_filler(word: str) -> bool:
+    return re.sub(r"[^a-z]", "", word.lower()) in FILLERS
+
+
+def drop_fillers(words: list[dict]) -> list[dict]:
+    """Captions never show an um or uh (the audio may still have it; see tools/fillers.py to cut it)."""
+    return [w for w in words if not is_filler(w["word"])]
+
+
 def apply_fixes(words: list[dict], fixes: dict) -> list[dict]:
     """Case-insensitive phrase replacement across consecutive words (e.g. 'auburn seo' -> 'AuburnSEO')."""
     if not fixes:

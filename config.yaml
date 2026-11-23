@@ -51,6 +51,7 @@ captions:
   keywords_neg: []             # pain and cost words shown in red, e.g. ["losing", "cost", "missed"]
   keywords_pos: []             # win and outcome words shown in green, e.g. ["booked", "ranked", "calls"]
   fixes: {}                    # transcript spelling fixes, e.g. {"auburn seo": "AuburnSEO", "opelika": "Opelika"}
+  drop_fillers: true           # captions never show um, uh, erm (tools/fillers.py --apply cuts them from the audio too)
 
 audio:
   target_lufs: -14             # convention for social, NOT a published Meta spec (see playbook)

@@ -79,7 +79,7 @@ split: {style: panel}         # optional: speaker in a rounded, inset panel with
 clips:                        # A-roll in timeline order; in/out are seconds in the source. `layout: split` puts the
                               # speaker in a bottom band over the brand backdrop and gives graphics the stage above (position: stage)
   - {src: raw/take3.mov, in: 12.40, out: 15.90, zoom: 1.0, focus: auto, slot: hook}   # slot: a name variants can swap
-  - {src: raw/take3.mov, in: 21.10, out: 26.75, zoom: 1.10, tighten: 0.45, layout: split}
+  - {src: raw/take3.mov, in: 21.10, out: 26.75, zoom: 1.10, tighten: 0.45, layout: split, skip: [[22.40, 22.71]]}   # skip: source ranges to drop (an um, a false start); tools/fillers.py --apply finds them
   - {src: raw/take5.mov, in: 3.00, out: 8.20, push: 1.08}   # slow push from 1.0 to 1.08
   - {src: raw/screenshot.png, duration: 2.5, push: 1.12}    # still image, Ken Burns push
 broll:                        # picture-only overlays on the timeline; the voice continues
@@ -311,6 +311,23 @@ def silences(path: Path, t_in: float, t_out: float, min_len: float, noise_db: fl
     for s, e in zip(starts, ends):
         out.append((t_in + max(s, 0.0), t_in + e))
     return out
+
+
+def apply_skips(ranges: list[tuple[float, float]], skips: list, pad: float = 0.03) -> list[tuple[float, float]]:
+    """Remove `skips` ([[a, b], ...] in source seconds, e.g. filler words from tools/fillers.py) from kept ranges."""
+    for sk in skips or []:
+        a, b = float(sk[0]) - pad, float(sk[1]) + pad
+        nxt = []
+        for x, y in ranges:
+            if b <= x or a >= y:
+                nxt.append((x, y))
+                continue
+            if a > x:
+                nxt.append((x, a))
+            if b < y:
+                nxt.append((b, y))
+        ranges = nxt
+    return [(x, y) for x, y in ranges if y - x > 0.05]
 
 
 def tighten_ranges(t_in: float, t_out: float, gaps: list[tuple[float, float]], keep: float) -> list[tuple[float, float]]:
@@ -715,7 +732,7 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
         at, dur = float(b["at"]), float(b["duration"])
         if use_html and b.get("pip") and b.get("still"):
             b["_html_pip"] = True   # rendered as a motion plate below (rounded frame, shadow, slow zoom)
-            timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label"), "pip": True, "engine": "html"})
+            timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "src_in": float(b.get("src_in") or 0.0), "label": b.get("label"), "pip": True, "engine": "html"})
             continue
         seg = tmp / f"broll_{idx}.mp4"
         clip = {"path": b["path"], "still": b["still"], "vstream": b["vstream"], "astream": None,
@@ -785,7 +802,7 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
             cur = f"[sv{idx}]"
             idx += 2
             b["_inset_done"] = True
-        timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "label": b.get("label"), "pip": bool(pip),
+        timeline["broll"].append({"src": b["src"], "at": at, "duration": dur, "src_in": src_in, "label": b.get("label"), "pip": bool(pip),
                                   "speaker_inset": bool(b.get("_inset_done"))})
         if b.get("label") and not proxy:
             lf = tmp / f"broll_label_{idx}.txt"
@@ -991,6 +1008,8 @@ def build_caption_plate(words_json: Path, out_w: int, out_h: int, total: float, 
 
     c = cfg.get("captions") or {}
     words = cap.apply_fixes(json.loads(words_json.read_text()), c.get("fixes") or {})
+    if c.get("drop_fillers", True):
+        words = cap.drop_fillers(words)
     style = str(edl.get("caption_style") or c.get("style") or "pill")
     if style not in HTML_STYLES:
         style = {"chunk": "clean", "karaoke": "pill", "reveal": "pill", "hormozi": "pill"}.get(style, "pill")
@@ -1072,6 +1091,7 @@ def timeline_of(edl_path: Path, ratio: str | None = None) -> list[dict]:
         ranges = [(c["in"], c["out"])]
         if c.get("tighten") and not c["still"]:
             ranges = tighten_ranges(c["in"], c["out"], silences(c["path"], c["in"], c["out"], float(c["tighten"])), keep)
+        ranges = apply_skips(ranges, c.get("skip"))
         for a, b in ranges:
             out.append({"src": c["src"], "src_in": round(a, 3), "src_out": round(b, 3), "at": round(t, 3), "duration": round(b - a, 3)})
             t += b - a
@@ -1160,6 +1180,7 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
             if c.get("tighten") and not c["still"]:
                 gaps = silences(c["path"], c["in"], c["out"], float(c["tighten"]))
                 ranges = tighten_ranges(c["in"], c["out"], gaps, keep)
+            ranges = apply_skips(ranges, c.get("skip"))
             for k, (a, b) in enumerate(ranges):
                 seg = tmp / f"seg_{n:02d}_{k:02d}.mp4"
                 render_segment(c, a, b, seg, ratio, out_w, out_h, fps, enc, focus,
