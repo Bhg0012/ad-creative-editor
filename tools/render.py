@@ -1140,7 +1140,7 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
 
 # ---------- loudness + captions ----------
 
-TP_HEADROOM_DB = 0.5   # loudnorm target sits this far under audio.true_peak_max_dbtp
+TP_HEADROOM_DB = 1.0   # limiter ceiling sits this far under audio.true_peak_max_dbtp: AAC encoding adds up to about 1 dB on sharp transients
 
 
 def measure_loudnorm(path: Path, target: float, tp: float) -> dict:
@@ -1415,7 +1415,7 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         # Aim the true peak 0.5 dB under the ceiling: AAC encoding adds up to about 0.3 dB of overshoot,
         # and QA measures the encoded file against the ceiling itself.
         tp = tp_max - TP_HEADROOM_DB
-        lf = loudnorm_filter(measure_loudnorm(comp, target, tp), target, tp) + f",alimiter=limit={10 ** (tp / 20):.4f}:level=false:attack=2:release=50"
+        lf = loudnorm_filter(measure_loudnorm(comp, target, tp), target, tp) + f",aresample=192000,alimiter=limit={10 ** (tp / 20):.4f}:level=false:attack=2:release=50,aresample=48000"   # 4x oversampled so peaks between samples are caught too
 
         master = cuts / f"{edl['name']}_master.mp4"
         finalize(comp, master, lf, None, ROOT / "brand" / "fonts", ENC_INTER, fps)
