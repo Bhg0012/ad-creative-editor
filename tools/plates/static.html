@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><style>{{theme}}
+/* Static ad templates (tools/statics.py --template). Everything sits inside the safe zone for the ratio.
+   Hierarchy (Alex Cooper V11, Dara Denney V4): hook biggest, then the qualifier, then what it is, then proof. */
+html, body { background: {{bg}}; }
+.photo { position: absolute; inset: 0; background: center / cover no-repeat; }
+.photo.dim::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.35) 45%, rgba(0,0,0,.82) 100%); }
+.photo.half { bottom: auto; height: 50%; top: 50%; }
+.paper { position: absolute; inset: 0; background: #f3f0ea; }
+.paper::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(60,40,30,.22) 1.6px, transparent 1.8px); background-size: 44px 44px; }
+.safe { position: absolute; top: var(--safe-top); bottom: var(--safe-bottom); left: calc(var(--safe-side) + .03 * var(--W)); right: calc(var(--safe-side) + .03 * var(--W));
+        display: flex; flex-direction: column; justify-content: {{justify}}; gap: calc(.018 * var(--H)); color: {{ink}}; }
+.h { font-weight: 800; font-size: {{hsize}}px; line-height: 1.04; letter-spacing: -0.025em; }
+.h em { font-style: normal; color: var(--accent); }
+.h .hl { background: {{hl}}; color: #fff; padding: 0 .12em; border-radius: .08em; }
+.q { font-weight: 800; font-size: calc({{hsize}}px * .42); letter-spacing: .02em; text-transform: uppercase; opacity: .85; }
+.sub { font-weight: 700; font-size: calc({{hsize}}px * .4); line-height: 1.22; opacity: .92; }
+.cta { align-self: center; background: var(--accent); color: #fff; font-weight: 800; font-size: calc({{hsize}}px * .36); padding: .55em 1.3em; border-radius: 999px; box-shadow: 0 10px 26px rgba(0,0,0,.25); }
+.shadow .h, .shadow .sub, .shadow .q { text-shadow: 0 3px 4px rgba(0,0,0,.55), 0 0 24px rgba(0,0,0,.35); }
+.list { display: flex; flex-direction: column; gap: calc(.014 * var(--H)); }
+.row { display: flex; align-items: center; gap: .55em; font-weight: 800; font-size: calc({{hsize}}px * .5); line-height: 1.15; }
+.num { flex: 0 0 auto; width: 1.55em; height: 1.55em; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .8em; }
+.vs { display: grid; grid-template-columns: 1fr 1fr; gap: calc(.012 * var(--W)); }
+.col { background: rgba(15,17,21,.06); border-radius: 22px; padding: .8em .7em; }
+.col.win { background: var(--primary); color: #fff; }
+.col b { display: block; font-size: calc({{hsize}}px * .42); margin-bottom: .5em; }
+.col div { font-weight: 700; font-size: calc({{hsize}}px * .34); line-height: 1.25; margin: .3em 0; }
+.myth { font-weight: 800; font-size: calc({{hsize}}px * .62); line-height: 1.1; }
+.myth s { text-decoration-thickness: .1em; text-decoration-color: #d12d3a; opacity: .7; }
+.tag { display: inline-block; font-size: .5em; letter-spacing: .08em; text-transform: uppercase; padding: .2em .6em; border-radius: 8px; margin-bottom: .3em; }
+.tag.bad { background: #d12d3a; color: #fff; } .tag.good { background: #1f9d5a; color: #fff; }
+.quote { font-weight: 800; font-size: calc({{hsize}}px * .7); line-height: 1.15; }
+.quote::before { content: "\201C"; display: block; font-size: 2.2em; line-height: .6; color: var(--accent); }
+.who { font-weight: 700; font-size: calc({{hsize}}px * .34); opacity: .8; }
+.note { align-self: center; background: #ffe86b; color: #1d1d1d; padding: 1em 1.1em 1.2em; width: 78%; transform: rotate(-3deg); box-shadow: 0 18px 30px rgba(0,0,0,.35);
+        font-weight: 700; font-style: italic; font-size: calc({{hsize}}px * .62); line-height: 1.2; }
+.letter { background: #fffdf8; color: #1f1b16; border-radius: 6px; padding: 1.4em 1.3em; box-shadow: 0 18px 40px rgba(0,0,0,.18); font-weight: 600; font-size: calc({{hsize}}px * .34); line-height: 1.45; }
+.letter .t { font-weight: 800; font-size: 1.5em; line-height: 1.15; margin-bottom: .6em; }
+.letter .sig { margin-top: 1em; font-style: italic; font-weight: 700; }
+.split-top { height: 46%; display: flex; flex-direction: column; justify-content: center; gap: calc(.014 * var(--H)); }
+</style></head><body>{{bg_html}}<div class="safe {{shadow}}">{{body}}</div><script>{{harness}}</script></body></html>

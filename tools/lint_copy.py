@@ -57,11 +57,24 @@ def known_numbers(cfg: dict) -> set[str]:
     return {n for n in nums if n}
 
 
+AI_ISMS = [   # phrasing that reads machine-written (Matt Wolfe, V20); WARN so a human can keep one on purpose
+    (re.compile(r"\b(it'?s|this is|that'?s)\s+not\s+(just|only|about)\b.{0,60}?[,;.]\s*(it'?s|this is|but)\b", re.I), "\"not just X, it's Y\""),
+    (re.compile(r"\bisn'?t\s+just\b", re.I), "\"isn't just\""),
+    (re.compile(r"\bhere'?s the thing\b", re.I), "\"here's the thing\""),
+    (re.compile(r"\bgame[\s-]?changer\b", re.I), "\"game changer\""),
+    (re.compile(r"\bunlock(s|ing)?\b", re.I), "\"unlock\""),
+    (re.compile(r"\b(elevate|supercharge|seamless(ly)?|in today'?s (fast-paced )?world|let'?s dive in|delve)\b", re.I), "stock AI wording"),
+]
+
+
 def lint_text(text: str, where: str, cfg: dict, kind: str = "text") -> list[dict]:
     out = []
     low = text.lower()
     if EM_DASH in text:
         out.append(finding("FAIL", where, text, "em dash; use a hyphen or rewrite"))
+    for rx, label in AI_ISMS:
+        if rx.search(text):
+            out.append(finding("WARN", where, text, f"AI-ism {label}: say it the way Bruce would say it to a contractor"))
     for w in JARGON:
         if re.search(rf"\b{re.escape(w)}\b", low) and not ("auburnseo" in low and w == "seo" and low.count("seo") == low.count("auburnseo")):
             out.append(finding("WARN", where, text, f"jargon '{w}': say the outcome (phone ringing, jobs booked, showing up first on Google)"))
@@ -156,6 +169,12 @@ def lint_batch(batch: Path, cfg: dict) -> list[dict]:
             out += lint_edl(p, cfg)
     for p in sorted((batch / "work" / "cuts").glob("*.ass")) if (batch / "work" / "cuts").exists() else []:
         out += lint_ass(p, cfg)
+    script = batch / "brief" / "08_scripts.md"
+    if script.exists():
+        import selects  # noqa: WPS433
+
+        for n, line in enumerate(selects.script_lines(script), 1):
+            out += lint_text(line, f"08_scripts.md line {n}", cfg, kind="script")
     return out
 
 

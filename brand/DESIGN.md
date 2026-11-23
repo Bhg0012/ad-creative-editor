@@ -222,3 +222,45 @@ Adopted (all usable from the EDL, see `scripts-and-editing.md`):
 
 Not adopted: the form-window mockup that imitates a lead form (never imitate Meta UI), the sponsored
 tag, 4-6 s cards (ours are 2-3 s in a 30-45 s ad), text that moves around the frame per word.
+
+## Training library, 20 videos (2026-11-23)
+
+Bruce had a Chrome session collect 20 post-Andromeda YouTube transcripts (`docs/training/`, kept local). Each was read in full and checked against the engine; the collector's own summary overstated several points (J and L cuts are in one video, not three; "-23 dB" and "B-roll every 1.8-3.6 s" are one creator's settings; Charley T's "five ads" are five flexible ads, 15 creatives). Rules adopted are credited by video number in the reference docs.
+
+| # | Title | Channel | Published | URL |
+|---|---|---|---|---|
+| 1 | The Easiest Way To Make Winning Meta Ads (in 2026) | Dara Denney | Aug 26, 2026 | https://www.youtube.com/watch?v=p4yXXdnCgWg |
+| 2 | I Made 10,000 Ads, Here's What Works Right Now | Dara Denney | Sep 28, 2026 | https://www.youtube.com/watch?v=4wM-i1cxtAM |
+| 3 | Learn 97% of Meta Ads in Under 19 Minutes | Sabri Suby | Jun 12, 2026 | https://www.youtube.com/watch?v=NTmWqnPIb2s |
+| 4 | How I Make AI Static Ads (in minutes) | Dara Denney | Jun 25, 2026 | https://www.youtube.com/watch?v=5C5VhqW9HCc |
+| 5 | The Only Static Ads Tutorial You'll Ever Need (29 concepts) | Alessio Cordeddu | May 24, 2026 | https://www.youtube.com/watch?v=tNe7Y9YU1y8 |
+| 6 | How To Sound Design ANY Video In 15 Minutes | Gavin Herman | Jun 22, 2026 | https://www.youtube.com/watch?v=9jBic4IDfxA |
+| 7 | 9 Meta Ad Hooks That Are Printing $$$ Right Now | Dara Denney | Jun 12, 2026 | https://www.youtube.com/watch?v=I8tXqqfjIX4 |
+| 8 | If You Only Watch One Ad Creative Guide, Make It This | Alessio Cordeddu | Apr 19, 2026 | https://www.youtube.com/watch?v=6E7AzoOxHxQ |
+| 9 | I Ranked 51 Meta Ad Creative Types (Tier List) | Dara Denney | Aug 13, 2026 | https://www.youtube.com/watch?v=KmbEjy0UBT8 |
+| 10 | I Made 10,000+ Ads. Only 6 Hooks Kept Winning | Fraser Cottrell | Sep 26, 2026 | https://www.youtube.com/watch?v=Mqj05tYuDI0 |
+| 11 | The ULTIMATE Guide to Static Ads in 2026 | Alex Cooper | Jul 30, 2026 | https://www.youtube.com/watch?v=XQwJRuN8p-Q |
+| 12 | I paid Alex Hormozi $235,000 for his Facebook Ads Strategy | Ben Heath | Sep 23, 2026 | https://www.youtube.com/watch?v=oTWfDI_91Fs |
+| 13 | $300m of Meta Ads Hacks in Under 22 mins | Sabri Suby | Sep 11, 2026 | https://www.youtube.com/watch?v=QN_LVgvik-k |
+| 14 | Copy This Simple Meta Ads Strategy | Professor Charley T | Aug 10, 2026 | https://www.youtube.com/watch?v=4DutxlMzqgc |
+| 15 | How to Scale Facebook Ads on a Low Budget (Post-Andromeda) | Sergio C | Aug 23, 2026 | https://www.youtube.com/watch?v=rBD9xJswb5k |
+| 16 | How to Edit Videos With Claude Code (From a 10-Year Editor) | Stockton Walbeck | Oct 28, 2026 | https://www.youtube.com/watch?v=gM40EV6Esh0 |
+| 17 | How to Edit Video Ads With AI (Step by Step with Claude Code) | Mr. Paid Social | Nov 11, 2026 | https://www.youtube.com/watch?v=Y5U33fM4nAg |
+| 18 | I Fully Automated My Video Editing Using Claude Code | Christian Peverelli | Oct 4, 2026 | https://www.youtube.com/watch?v=HzXD4GVqXwM |
+| 19 | How I Fully Automated My Video Editing (Claude Code) | Jason Cooperson | Jun 29, 2026 | https://www.youtube.com/watch?v=XeTAlZiIWHE |
+| 20 | How I Get Claude To Edit My Videos (Step-By-Step) | Matt Wolfe | Nov 4, 2026 | https://www.youtube.com/watch?v=ep4psgAFOqc |
+
+Adopted, by area:
+- **Cutting and sound (V6, V16-V20):** cut edges snap to the waveform; equal-power crossfades at every seam; music set relative to the voice with an EQ dip in the voice band; music sections (suspense under the hook, then a low bed); lighter 2:1 voice compression with a 15 kHz low-pass; SFX peak on the visual peak and a busyness check; new SFX impact, suckback, hit.
+- **Review loop (V17, V18, V20):** a fresh-eyes review by a separate subagent before Bruce sees a cut; a session log of what was tried; every note saved as a rule the same session; review notes that persist and click to seek.
+- **Hooks and concepts (V1, V2, V7, V8, V10):** a hook template library mapped to funnel stage; self-selection scoring ("who will this attract?"); big swings, not word swaps; hello and close concepts; one non-PAS concept per batch; format templates (yapper, amateur investigation, David vs Goliath, green-screen commentary).
+- **Statics (V4, V5, V11, V13):** hierarchy, one-second test, max 3 text elements, 11 templates including the raw `lofi` photo.
+- **Copy (V11, V13, V20):** assume no one knows the brand; exact customer words; one long story variant; lead-in on the high point; no AI-isms.
+- **Launch (V12-V15):** 7-day kill window with an account-wide check first; small-budget fair test with an impression cap; protect a working campaign and test new batches on the side; Instant Form disqualification and phone verification; budget steps only while beating target.
+
+Rejected, and why:
+- Volume plays sized for $1,000+/day accounts (50+ ads a week, 20-40 headlines, zombie campaigns, 30-50% of spend on partnership ads): Bruce's budget cannot feed them (Sergio C, V15: "You graduate into volume").
+- Faked street interviews, AI investigation ads, AI people, phantom unbranded pages, press logos, price anchors, BOGO, sellout claims: compliance.
+- Paid tools (Eddie, Tella, Epidemic Sound, ElevenLabs, a Gemini review layer by default) and downloading other people's videos as B-roll.
+- Single-creator numbers as rules: Jason Cooperson's -23 dB music slider (V19), Matt Wolfe's 1.8-3.6 s B-roll cadence and magenta captions (V20), quoted hook rates of 45% and 77% (V2, V7).
+- Automated J and L cuts: they move audio across a seam and can break lip sync; manual only, where B-roll covers the picture.

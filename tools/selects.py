@@ -32,6 +32,19 @@ def norm(tok: str) -> str:
     return re.sub(r"[^\w$%']", "", tok.lower())
 
 
+CUE_RE = re.compile(r"\[\s*[A-Z][A-Z -]{1,20}:[^\]]*\]")   # visual cues written into a prose script (Mr. Paid Social, V17)
+
+
+def script_cues(path: Path) -> list[tuple[str, str, str]]:
+    """(line text without cues, cue kind, cue text) for every bracket cue, so the beat map can carry them."""
+    out = []
+    for raw in path.read_text().splitlines():
+        for m in CUE_RE.finditer(raw):
+            kind, _, body = m.group(0)[1:-1].partition(":")
+            out.append((CUE_RE.sub(" ", raw).strip(), kind.strip().upper(), body.strip()))
+    return out
+
+
 def script_lines(path: Path) -> list[str]:
     lines = []
     for raw in path.read_text().splitlines():
@@ -44,6 +57,7 @@ def script_lines(path: Path) -> list[str]:
         elif line.startswith("|") or re.match(r"^\|?\s*-{2,}", line):
             continue  # table header or divider
         line = re.sub(r"\*\*|__|`", "", line)
+        line = CUE_RE.sub(" ", line).strip()   # [SCREEN: ...] [BROLL: ...] [PLATE: ...] are directions, not spoken words
         if len(norm(line)) >= 3:
             lines.append(line)
     return lines

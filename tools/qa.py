@@ -73,6 +73,11 @@ def spec_checks(path: Path, info: dict) -> tuple[list[dict], dict]:
         ok = (w, h) in RESOLUTIONS[ratio]
         res.append(check("resolution", "PASS" if ok else "FAIL",
                          f"{w}x{h} ({ratio}); accepted {RESOLUTIONS[ratio]}"))
+    if a is not None and v.get("duration") and a.get("duration"):
+        frame = 1.0 / max(1.0, fps(v.get("avg_frame_rate", "30/1")) or 30.0)
+        gap = abs(float(v["duration"]) - float(a["duration"]))
+        res.append(check("audio and video same length", "PASS" if gap <= frame + 0.03 else "WARN",
+                         f"video {float(v['duration']):.3f}s, audio {float(a['duration']):.3f}s"))
     sar = v.get("sample_aspect_ratio", "1:1")
     res.append(check("square pixels", "PASS" if sar in ("1:1", "0:1") else "FAIL", f"SAR {sar}"))
     r, avg = fps(v.get("r_frame_rate", "0/1")), fps(v.get("avg_frame_rate", "0/1"))
@@ -446,6 +451,21 @@ def seam_checks(path: Path, sidecar: dict) -> list[dict]:
             clicks.append(f"{t:.2f}s ({step:.2f})")
     res = [check("no clicks at cuts", "PASS" if not clicks else "WARN",
                  "ok" if not clicks else "sample jumps at " + ", ".join(clicks[:6]) + "; add tighten_keep or move the cut")]
+    hot = []
+    for t in seams:
+        raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-ss", f"{max(0, t - 0.03):.3f}", "-t", "0.06", "-i", str(path),
+                              "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
+        a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+        if len(a) < 800:
+            continue
+        half = len(a) // 2
+        lvl = [20 * np.log10(max(float(np.sqrt(np.mean(x[-320:] ** 2 if i == 0 else x[:320] ** 2))), 1e-6))
+               for i, x in enumerate((a[:half], a[half:]))]
+        if min(lvl) > HOT_SEAM_DB:
+            hot.append(f"{t:.2f}s ({lvl[0]:.0f}/{lvl[1]:.0f} dB)")
+    res.append(check("cut lands in speech", "PASS" if not hot else "WARN",
+                     "ok: every cut sits in a pause" if not hot else "speech on both sides of the cut at " + ", ".join(hot[:6])
+                     + "; move the edge to a pause or raise edit.snap_cuts"))
     caps = sidecar.get("captions") or {}
     wj = Path(caps.get("words_json", "")) if caps.get("words_json") else None
     if wj and wj.is_file():
@@ -467,6 +487,97 @@ def seam_checks(path: Path, sidecar: dict) -> list[dict]:
         res.append(check("no repeated words across cuts", "PASS" if not dups else "FAIL",
                          "ok" if not dups else "a retake survived: " + "; ".join(dups[:5])))
     return res
+
+
+HOT_SEAM_DB = -26.0   # RMS on both sides of a cut above this means the cut is inside speech, not in a pause
+
+
+def pace_checks(sidecar: dict, duration: float) -> list[dict]:
+    """Visual rhythm from the render sidecar: gaps with no visual change, and sound effects that crowd each other."""
+    end = duration
+    for c in sidecar.get("clips", []):
+        if c.get("src") == "end_card":
+            end = min(end, float(c["at"]))
+    events = {0.0}
+    for c in sidecar.get("clips", [])[1:]:
+        if c.get("src") != "end_card":
+            events.add(round(float(c["at"]), 2))
+    for b in sidecar.get("broll", []):
+        events.add(round(float(b["at"]), 2))
+        events.add(round(float(b["at"]) + float(b["duration"]), 2))
+    for g in sidecar.get("graphics", []):
+        if g.get("type") not in ("progress", "backdrop"):
+            events.add(round(float(g["at"]), 2))
+    for t in sidecar.get("punches", []) or []:
+        events.add(round(float(t), 2))
+    ev = sorted(e for e in events if e < end) + [end]
+    slow = []
+    for a, b in zip(ev, ev[1:]):
+        limit = 4.0 if a < 10.0 else 6.0
+        if b - a > limit:
+            slow.append(f"{a:.1f}-{b:.1f}s ({b - a:.1f}s)")
+    res = [check("pacing: a visual change every few seconds", "PASS" if not slow else "WARN",
+                 f"{len(ev) - 1} visual events before the end card, {(len(ev) - 1) / max(end, 0.1):.2f} per second" if not slow
+                 else "nothing changes on screen during " + ", ".join(slow[:5]) + " (limit 4 s in the first 10 s, 6 s after)")]
+    sfx = sorted(float(x["at"]) for x in sidecar.get("sfx", []) or [])
+    if sfx:
+        crowded = [f"{a:.2f}s" for a, b in zip(sfx, sfx[1:]) if b - a < 0.4]
+        dense = len(sfx) / max(end, 0.1) > 0.5
+        res.append(check("sound effects not too busy", "PASS" if not crowded and not dense else "WARN",
+                         f"{len(sfx)} effects, {len(sfx) / max(end, 0.1):.2f} per second" if not crowded and not dense else
+                         (f"two effects within 0.4 s at {', '.join(crowded[:4])}; " if crowded else "")
+                         + (f"{len(sfx)} effects is more than 1 per 2 s; cut the ones that do not mark a real event" if dense else "")))
+    mus = sidecar.get("music") or {}
+    if mus.get("sections"):
+        lu = mus.get("under_voice_lu")
+        res.append(check("music level relative to the voice", "PASS",
+                         f"bed set {lu} LU under the voice (measured voice {mus.get('voice_lufs')} LUFS)" if lu is not None
+                         else "explicit gain_db on every section; check by ear that the bed never competes with the voice"))
+    return res
+
+
+def review_pack(path: Path, sidecar: dict, out: Path) -> Path:
+    """Everything a fresh reviewer needs without having made the edit: frame strips at 10 fps around every cut and
+    every graphic entrance, a 0.5 s loudness curve, and the seam numbers. Claude cannot hear, so audio arrives as numbers."""
+    import numpy as np
+
+    out.mkdir(parents=True, exist_ok=True)
+    marks = [("cut", float(c["at"])) for c in sidecar.get("clips", [])[1:]]
+    marks += [(f"graphic-{g['type']}", float(g["at"])) for g in sidecar.get("graphics", []) if g.get("type") not in ("progress", "backdrop")]
+    marks += [(f"broll-{Path(str(b['src'])).stem}", float(b["at"])) for b in sidecar.get("broll", [])]
+    for n, (kind, t) in enumerate(sorted(marks, key=lambda m: m[1])):
+        a = max(0.0, t - 0.3)
+        subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t", "0.8", "-i", str(path),
+                        "-vf", "fps=10,scale=180:-2,tile=8x1:padding=2:color=0x303030", "-frames:v", "1",
+                        str(out / f"strip_{n:02d}_{t:06.2f}s_{kind}.png")], capture_output=True)
+    res = subprocess.run([ffmpeg(), "-nostdin", "-v", "info", "-i", str(path), "-vn", "-af", "ebur128=metadata=1,ametadata=print:key=lavfi.r128.M",
+                          "-f", "null", "-"], capture_output=True, text=True)
+    pts = re.findall(r"pts_time:([\d.]+)[^\n]*\n[^\n]*lavfi\.r128\.M=(-?[\d.]+|-inf)", res.stderr)
+    rows, nxt = ["second,momentary_lufs"], 0.0
+    for t, m in pts:
+        if float(t) >= nxt:
+            rows.append(f"{float(t):.1f},{m}")
+            nxt += 0.5
+    (out / "loudness_curve.csv").write_text("\n".join(rows) + "\n")
+    seams = []
+    for c in sidecar.get("clips", [])[1:]:
+        t = float(c["at"])
+        raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-ss", f"{max(0, t - 0.03):.3f}", "-t", "0.06", "-i", str(path),
+                              "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
+        x = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+        if len(x) >= 800:
+            h = len(x) // 2
+            seams.append({"at": t, "before_db": round(20 * np.log10(max(float(np.sqrt(np.mean(x[:h][-320:] ** 2))), 1e-6)), 1),
+                          "after_db": round(20 * np.log10(max(float(np.sqrt(np.mean(x[h:][:320] ** 2))), 1e-6)), 1)})
+    (out / "seams.json").write_text(json.dumps(seams, indent=1))
+    (out / "README.md").write_text(
+        "# Review pack\n\nFor a reviewer who did not make this edit. Look for: an animation that plays twice, a graphic that flashes\n"
+        "for a split second, text that lands too late to read, a graphic on the face or mouth, a word said twice, lips out of sync,\n"
+        "a cut inside a word (seams.json: both sides louder than -26 dB), a loudness jump in loudness_curve.csv.\n\n"
+        "- strip_*.png: 8 frames at 10 fps from 0.3 s before each cut, graphic entrance and B-roll start\n"
+        "- loudness_curve.csv: momentary loudness every 0.5 s\n- seams.json: audio level 20 ms either side of every cut\n"
+        "Return a list of defects as `time | what | fix`.\n")
+    return out
 
 
 def lull_scan(path: Path, threshold_db: float = -27.0, min_dur: float = 0.5) -> list[dict]:
@@ -523,7 +634,7 @@ def similarity_checks(paths: list[Path]) -> list[str]:
     return lines
 
 
-def qa_one(path: Path, qa_dir: Path, target: float, tp_max: float, script: Path | None = None) -> dict:
+def qa_one(path: Path, qa_dir: Path, target: float, tp_max: float, script: Path | None = None, review: bool = False) -> dict:
     out = qa_dir / path.stem
     out.mkdir(parents=True, exist_ok=True)
     info = probe(path)
@@ -555,6 +666,9 @@ def qa_one(path: Path, qa_dir: Path, target: float, tp_max: float, script: Path 
         if sidecar:
             results += plate_over_face(path, sidecar)
             results += seam_checks(path, sidecar)
+            results += pace_checks(sidecar, meta["duration"])
+            if review:
+                review_pack(path, sidecar, qa_dir / path.stem / "review_pack")
         evidence(path, out, meta)
     results += [check(m, "MANUAL", "look at the images in this folder") for m in MANUAL_CHECKS]
     report = {"file": str(path), **meta, "results": results}
@@ -567,13 +681,15 @@ def main() -> int:
     ap.add_argument("files", nargs="+")
     ap.add_argument("--qa-dir", required=True)
     ap.add_argument("--script", help="script file; checks that every line is heard in the captions")
+    ap.add_argument("--review-pack", action="store_true",
+                    help="also write qa/<ad>/review_pack/ (frame strips around cuts and graphics, loudness curve, seam levels) for a fresh-eyes reviewer")
     args = ap.parse_args()
     audio_cfg = load_config().get("audio", {}) or {}
     target = float(audio_cfg.get("target_lufs", -14))
     tp_max = float(audio_cfg.get("true_peak_max_dbtp", -1.0))
     qa_dir = Path(args.qa_dir)
     paths = [Path(f) for f in args.files]
-    reports = [qa_one(p, qa_dir, target, tp_max, Path(args.script) if args.script else None) for p in paths]
+    reports = [qa_one(p, qa_dir, target, tp_max, Path(args.script) if args.script else None, args.review_pack) for p in paths]
 
     md = ["# QA report", "", "Automated checks below. MANUAL rows must be checked by eye in each ad's folder "
           "and marked in this file before delivery.", ""]

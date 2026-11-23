@@ -23,6 +23,9 @@ Market: {market} | Offer: {offer} | Started: {date}
 
 Update this file at every gate so any future session can resume exactly here.
 
+Diagnosis (Gate 1, one or two sentences: why the current ads win or lose and what this batch fixes):
+TBD
+
 | Stage | Output | Gate | Status |
 |---|---|---|---|
 | 1 Research | brief/01_research.md, 02_swipe.md, 03_my_data.md | GATE 1 | not started |
@@ -36,6 +39,13 @@ Update this file at every gate so any future session can resume exactly here.
 | 9 Launch plan | brief/10_launch.md | none | not started |
 
 ## Notes from Bruce at each gate
+
+## Session log
+
+What was tried on each render pass, so later sessions do not repeat dead ends (Mr. Paid Social, V17).
+
+| Date | Ad | Tried | Result | Keep or avoid |
+|---|---|---|---|---|
 
 """
 

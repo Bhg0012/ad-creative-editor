@@ -1,6 +1,6 @@
 """Default sound effects, synthesized with ffmpeg so the engine works before any library is bought.
 
-Writes pop, click, whoosh, ding, riser as 48 kHz wav files. Real licensed SFX in audio/sfx/
+Writes pop, click, whoosh, ding, riser, thud, swipe, sub, impact, suckback and hit as 48 kHz wav files. Real licensed SFX in audio/sfx/
 with the same names take priority (tools/render.py looks there first).
 
 Usage:
@@ -32,6 +32,12 @@ RECIPES = {
     "swipe": ("anoisesrc=c=pink:r=48000:a=0.8:d=0.25", "highpass=f=900,lowpass=f=7000,afade=t=in:d=0.05,afade=t=out:st=0.1:d=0.15,volume=0.7"),
     # sub: a soft low pulse under a reveal
     "sub": ("sine=frequency=45:sample_rate=48000:duration=0.6", "afade=t=in:d=0.08,afade=t=out:st=0.2:d=0.4,volume=0.7"),
+    # impact: a low body plus a short noise crack, layered across frequencies so it fills the room (Gavin Herman, V6)
+    "impact": ("aevalsrc='0.9*sin(2*PI*55*t)*exp(-7*t)+0.35*(2*random(0)-1)*exp(-35*t)':s=48000:d=0.6", "lowpass=f=4000,afade=t=out:st=0.4:d=0.2,volume=0.9"),
+    # suck-back: a whoosh played backwards, pulling into a moment (V6)
+    "suckback": ("anoisesrc=c=pink:r=48000:a=0.9:d=0.5", "highpass=f=300,lowpass=f=6000,afade=t=out:st=0.05:d=0.45,areverse,volume=0.8"),
+    # hit: an impact with a reverb tail, for the last beat before the end card (V6)
+    "hit": ("aevalsrc='0.8*sin(2*PI*80*t)*exp(-6*t)+0.4*(2*random(0)-1)*exp(-25*t)':s=48000:d=1.6", "aecho=0.8:0.6:60|120:0.4|0.25,lowpass=f=5000,afade=t=out:st=0.9:d=0.7,volume=0.8"),
 }
 
 

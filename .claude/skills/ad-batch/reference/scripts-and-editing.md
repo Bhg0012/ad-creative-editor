@@ -17,10 +17,20 @@ Script line format:
 
 `[timecode] | VO / dialogue | on-screen text | visual (A-roll / B-roll / graphic / screen rec) | SFX | music cue`
 
+Prose scripts may carry visual cues in brackets inside the VO line: `[SCREEN: a real Google profile with 9 reviews]`, `[BROLL: truck pulling into a driveway]`, `[PLATE: compare 9 vs 140 (example)]`. Writing the visual idea into the script is what gets the editor to the right shot (Mr. Paid Social, V17). `tools/selects.py` strips the cues before matching takes; carry each cue into the beat map row for that line.
+
+**Shot list: visual-hook takes.** For every hero hook, also record (Fraser Cottrell, V10; Dara Denney, V7):
+- a 0.5x ultra-wide walking take that starts mid-stride;
+- a curiosity action in the first second (reaching into the truck, pulling out the phone, opening the laptop);
+- a close-up "telling a secret" take, very close to the lens;
+- a whispered take of the hook line (keep it for when a hook has proven itself);
+- optionally a native face-filter take, used only as an iteration of a winner.
+
 ## Visual cadence
 
 - Pattern interrupt every 2-4s in the first 10s (cut, punch-in, B-roll, graphic, text change), then relax slightly. Match the VO's energy; fast is good, chaotic is not.
-- Every cut gets a 30 ms audio fade (render.py does it); cut on word boundaries, never inside a word, and leave 0.12 s of air at each tightened pause so breaths do not clip.
+- Cuts: every cut edge snaps to the quietest 10 ms within 80 ms of the transcript time (`edit.snap_cuts: 0.08`, quiet means under `edit.snap_floor_db: -40`), because transcript word times drift about 150 ms and the waveform does not. Cut using both the transcript and the waveform, after the sound ends, not when the model thinks the word ends (Matt Wolfe, V20). Every seam then gets an equal-power audio crossfade rebuilt from the source handles (`edit.audio_crossfade: 0.02` half-width), so room tone never drops to silence between segments; where no handle exists (file start, a still) the edge falls back to a 30 ms fade. Leave 0.12 s of air at each tightened pause so breaths do not clip. Pacing target: a consistent run-on sentence, no pauses or stutters between lines (Mr. Paid Social, V17).
+- J and L cuts (Stockton Walbeck, V16) are not automated: they move audio across a seam and can break lip sync. Use them only where the overlapped picture is covered by B-roll or a plate.
 - Editor reflexes are on by default (`config.yaml` `edit.*`): every pause over 0.45 s inside a clip is tightened, consecutive talking-head clips alternate 1.0 and 1.08 framing, every cut after the first opens 4% pushed in and settles over 0.25 s (a motion cut, not a static jump), and A-roll gets a light grade. Per clip: `tighten: 0`, `zoom: x`, `settle: 0` or `settle: 1.06` override. Graphics and their sounds cue 80 ms before the word (`graphics.lead_s`).
 - Punch-in zooms of 105-115% on emphasis words; alternate framing so jump cuts look intentional. Do not punch in past the footage's real resolution (soft faces kill trust).
 - B-roll and screen recordings show what the VO says ("a text goes out" -> show the phone receiving it).
@@ -45,7 +55,7 @@ Every ad is described by `work/edl/<adname>.yaml` (print a template with `tools/
 | `look` | Optional light grade for A-roll: `contrast`, `brightness`, `saturation`, `gamma`, `sharpen`, `temperature` (kelvin, 5200 warms a dim room), `vignette` (0-1). Keep it subtle (1.03-1.08); phone footage is already contrasty. |
 | `hook_text`, `hook_text_seconds` | Headline from frame 1, inside the top safe zone, with a dark box. Max about 7 words. |
 | `lower_third` | `text`, `at`, `duration`: name + "Auburn, AL" in the accent color, above the caption band. |
-| `music` | `src`, `gain_db` (default -18), `duck: true` (sidechain under the voice), `fade_out`. Loops if shorter than the ad. |
+| `music` | One bed: `src`, `gain_db`, `duck: true` (sidechain under the voice), `fade_out`. Or a list of sections `{src, at, until, src_in, gain_db, fade_in, fade_out}`, for example a suspense bed under the hook, then a low upbeat bed (Christian Peverelli, V18). A section with no `gain_db` is set `audio.music_under_voice_lu` (20) LU under the measured voice, whatever the track's own level; the rendered levels go into `render.json` under `music`. Every section gets an EQ dip of `audio.music_voice_dip_db` (4 dB) around 2 kHz so it does not fight the voice. Loops if shorter than its section. |
 | `sfx[]` | `src`, `at`, `gain_db`. |
 | `end_card` | `headline` (optional promise line), `text` (the CTA, drawn as an accent pill button), `subtext`, `seconds`, `logo`: brand-primary card with the exact action. |
 
@@ -89,6 +99,7 @@ Every graphic is a motion plate: an HTML template in `tools/plates/` filled from
 | `plates[] type: chips` | grid of short words with sub-labels | what is included |
 | `plates[] type: frame_label` | corner brackets, REC dot, running timecode | "raw footage" moments, behind the scenes |
 | `plates[] type: label` with `variant: boxes` | each word in a white box, `*word*` in accent | section titles mid-video |
+| `plates[] type: post` | a generic text-post card (avatar initial, name, one or two lines) as the first frame of a video; never a copy of a real platform's layout | the tweet or Reddit-style first frame that still works (Dara Denney, V9), with a real or clearly hypothetical line |
 | `plates[] type: takeover` | one giant word or number filling the frame (`text`, `sub`, `bg: dark|light|#hex`), low thud | the number of the ad, a one-word turn ("Nine.") |
 | `plates[] type: strike` | `title`, `items` struck through one by one, then `answer` in accent | "what everyone tries" before the mechanism |
 | `broll[]` still with `pip.stamp` and `pip.highlight: {x, y, w, h}` | a corner stamp ("LIVE", "RAW") and a highlighted band over the line that matters | screenshots where one line is the point |
@@ -132,7 +143,9 @@ Only when a concept needs something these templates cannot do (a chart, a map, a
 
 ## Sound
 
-- **Voice first:** high-pass ~80 Hz, gentle de-ess, light compression, noise reduction only if needed. It must not sound processed.
+- **Voice first:** high-pass ~80 Hz, low-pass at `audio.voice_lowpass_hz` (15000), gentle de-ess, light compression, noise reduction only if needed. It must not sound processed. The voice lives between about 80 Hz and 12-16 kHz, and compression is 2:1 at the speech floor (Gavin Herman, V6). `audio.voice_compress`: `light` (default, 2:1 at -20 dB), `medium` (2.5:1 at -18 dB, the old setting) or `off`. A first draft that sounded over-compressed was the first note on Matt Wolfe's AI edit (V20); if Bruce hears it, switch to `off` for that batch.
+- **Music level is relative.** A raw `gain_db` means something different for every track, so leave it unset and let the engine place the bed 20 LU under the voice. One creator's -23 dB setting (Jason Cooperson, V19) is a slider value on one track, not a rule. Music sits very low: "suspenseful in the hook, then something upbeat and lo-fi, very, very low" (Christian Peverelli, V18).
+- **SFX timing:** the loudest point of a sound lands on the visual peak of the graphic (the spring overshoot of a card), not just on the word (Gavin Herman, V6: "It takes 10 seconds and is the difference between pro and amateur sound"). SFX available: pop, click, whoosh, ding, riser, thud, swipe, sub, plus impact (layered hit), suckback (reversed whoosh into a moment) and hit (impact with a reverb tail for the final beat). Too busy is the common failure: Christian Peverelli (V18) tried 8 to 10 sounds and removed most; QA warns at more than one SFX per 2 s or two within 0.4 s.
 - **Music:** only from `audio/music` with an ad-use license on file, or Meta Sound Collection. Never in-app trending music. Energy matches angle (upbeat for opportunity, minimal for pain). Duck under VO by roughly 15-20 dB. Hit a musical change on the CTA if possible.
 - **SFX** from `audio/sfx`, sparingly: soft pop or click on a card, ding on "review received" or "phone ringing" moments, thud under a takeover, riser into the proof. A whoosh only when something actually crosses the frame (a swipe, a scroll), never on a pop; whooshes on every graphic are the loudest "AI edit" tell. Always below the voice.
 - **Loudness:** two-pass `loudnorm` to `audio.target_lufs` and `audio.true_peak_max_dbtp` from `config.yaml`; `tools/qa.py` verifies.

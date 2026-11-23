@@ -14,8 +14,13 @@ Input: an Ads Manager CSV export, a Windsor.ai pull, or a JSON file saved from t
 If rows carry a date column (daily breakdown), each ad also gets a fatigue read: CTR in the
 last 7 days vs the 7 before, plus latest frequency (playbook `creative_fatigue`).
 
+Also: video plays at 25/50/75/95/100% give a retention table, and with --render-dir exports the biggest drop
+is mapped to what was on screen; a "qualified leads" column adds cost per qualified lead; --impression-cap N
+ranks ads that reached N impressions on upstream signals (small-budget fair test).
+
 Usage:
     .venv/bin/python tools/metrics.py data/export.csv --target-cpl 60 --out data/analysis
+    .venv/bin/python tools/metrics.py data/export.csv --target-cpl 60 --out data/analysis --render-dir batches/<id>/exports --impression-cap 2000
     .venv/bin/python tools/metrics.py data/mcp_pull.json --target-cpl 60 --out data/analysis
 """
 from __future__ import annotations
@@ -37,8 +42,15 @@ ALIASES = {
     "leads": ["leads", "onfacebookleads", "actionslead", "leadsform", "results"],
     "avg_watch_s": ["videoaverageplaytime", "videoavgtimewatchedactionsvideoview", "averagewatchtime"],
     "frequency": ["frequency"],
+    "p25": ["videoplaysat25", "videoplaysat25percent", "videop25watchedactions", "videop25watchedactionsvideoview"],
+    "p50": ["videoplaysat50", "videoplaysat50percent", "videop50watchedactions", "videop50watchedactionsvideoview"],
+    "p75": ["videoplaysat75", "videoplaysat75percent", "videop75watchedactions", "videop75watchedactionsvideoview"],
+    "p95": ["videoplaysat95", "videoplaysat95percent", "videop95watchedactions", "videop95watchedactionsvideoview"],
+    "p100": ["videoplaysat100", "videoplaysat100percent", "videop100watchedactions", "videop100watchedactionsvideoview"],
+    "qualified_leads": ["qualifiedleads", "conversionleads", "submitapplication", "qualified"],
     "date": ["date", "day", "datestart", "reportingstarts", "daystart"],
 }
+QUARTILES = [("p25", 0.25), ("p50", 0.50), ("p75", 0.75), ("p95", 0.95)]
 MIN_IMPRESSIONS = 1000  # below this, rates are too noisy to read
 NAME_RE = re.compile(r"^(?P<market>[A-Za-z0-9-]+)_(?P<offer>[A-Za-z0-9-]+)_(?:(?P<price>[A-Za-z0-9-]+)_)?(?P<angle>[A-Za-z0-9-]+)_"
                      r"(?P<hooktype>[A-Za-z0-9-]+)_(?P<length>\d+)s_(?P<ratio>\d+x\d+)_v(?P<version>\d+)")
@@ -143,9 +155,74 @@ def compute(df: pd.DataFrame) -> pd.DataFrame:
     g["ctr_link"] = ratio("link_clicks", "impressions")
     g["cpl"] = ratio("spend", "leads")
     g["cpm"] = ratio("spend", "impressions") * 1000
+    if "qualified_leads" in g:
+        g["cost_per_qualified"] = ratio("spend", "qualified_leads")
     g["low_sample"] = g["impressions"] < MIN_IMPRESSIONS
     g.attrs["fatigue"] = df.attrs.get("fatigue")
     return g
+
+
+def on_screen_at(sidecar: dict, t: float) -> str:
+    """What the viewer was looking at, t seconds in: the graphic, B-roll or A-roll clip under that moment."""
+    for g in sidecar.get("graphics", []):
+        if g.get("type") not in ("progress", "backdrop") and float(g["at"]) <= t < float(g["at"]) + float(g["duration"]):
+            return f"{g['type']} graphic" + (f" \"{str(g.get('text'))[:30]}\"" if g.get("text") else "")
+    for b in sidecar.get("broll", []):
+        if float(b["at"]) <= t < float(b["at"]) + float(b["duration"]):
+            return f"B-roll {Path(str(b['src'])).stem}"
+    for c in sidecar.get("clips", []):
+        if float(c["at"]) <= t < float(c["at"]) + float(c["duration"]):
+            return "end card" if c.get("src") == "end_card" else f"A-roll {Path(str(c['src'])).stem} ({c.get('layout', 'full')})"
+    return "end of ad"
+
+
+def retention(g: pd.DataFrame, render_dir: Path | None) -> pd.DataFrame | None:
+    """Share of 3-second viewers still watching at 25/50/75/95%, the biggest drop, and (with the render sidecars)
+    what was on screen when people left (Matt Wolfe, V20: read the retention curve, not just the totals)."""
+    have = [q for q, _ in QUARTILES if q in g]
+    if not have or "plays_3s" not in g:
+        return None
+    import json
+
+    rows = []
+    for _, r in g.iterrows():
+        base = r["plays_3s"]
+        if not base or base <= 0:
+            continue
+        curve = [(0.0, 1.0)] + [(f, r[q] / base) for q, f in QUARTILES if q in g]
+        drops = [(a[0], b[0], a[1] - b[1]) for a, b in zip(curve, curve[1:])]
+        worst = max(drops, key=lambda d: d[2])
+        row = {"ad_name": r["ad_name"], **{q: (r[q] / base) for q, _ in QUARTILES if q in g},
+               "biggest_drop": f"{worst[2]:.0%} between {worst[0]:.0%} and {worst[1]:.0%}"}
+        sc = (render_dir / f"{r['ad_name']}.render.json") if render_dir else None
+        if sc is not None and sc.exists():
+            side = json.loads(sc.read_text())
+            dur = float(side.get("duration") or 0)
+            if dur:
+                t = (worst[0] + worst[1]) / 2 * dur
+                row["lost_around"] = f"{worst[0] * dur:.1f}-{worst[1] * dur:.1f}s, during {on_screen_at(side, t)}"
+        rows.append(row)
+    return pd.DataFrame(rows) if rows else None
+
+
+def impression_cap(g: pd.DataFrame, cap: int) -> pd.DataFrame:
+    """Small-budget fair test (Sergio C, V15): every ad gets about the same exposure, then ads that reached the cap
+    are ranked on upstream signals. CPL at 1,000-3,000 impressions is noise; hook, hold, link CTR and CPM are not."""
+    d = g.copy()
+    d["reached_cap"] = d["impressions"] >= cap
+    ok = d[d["reached_cap"]].copy()
+    for col in ("hook_rate", "hold_rate", "ctr_link"):
+        if col in ok:
+            ok[f"{col}_rank"] = ok[col].rank(ascending=False)
+    if "cpm" in ok:
+        ok["cpm_rank"] = ok["cpm"].rank(ascending=True)
+    rank_cols = [c for c in ok.columns if c.endswith("_rank")]
+    if rank_cols:
+        ok["fair_test_score"] = ok[rank_cols].mean(axis=1)
+        ok = ok.sort_values("fair_test_score")
+    waiting = d[~d["reached_cap"]][["ad_name", "impressions"]]
+    ok.attrs["waiting"] = waiting
+    return ok
 
 
 def diagnose(g: pd.DataFrame, target_cpl: float | None) -> pd.DataFrame:
@@ -227,13 +304,15 @@ def main() -> int:
     ap.add_argument("csv", help="CSV export or JSON saved from the Meta Ads MCP")
     ap.add_argument("--target-cpl", type=float)
     ap.add_argument("--out", required=True, help="output folder")
+    ap.add_argument("--render-dir", help="exports folder with <ad>.render.json sidecars, to say what was on screen at each drop-off")
+    ap.add_argument("--impression-cap", type=int, help="small-budget fair test: rank ads that reached this many impressions on upstream signals")
     args = ap.parse_args()
     g = diagnose(compute(load_rows(Path(args.csv))), args.target_cpl)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     g.to_csv(out / "ad_metrics.csv", index=False)
     cols = [c for c in ("ad_name", "spend", "impressions", "hook_rate", "hold_rate", "ctr_link", "leads", "cpl",
-                        "diagnosis", "verdict") if c in g]
+                        "qualified_leads", "cost_per_qualified", "diagnosis", "verdict") if c in g]
     md = ["# Ad metrics", "", f"Rates from {len(g)} ads. Medians use only ads with {MIN_IMPRESSIONS}+ impressions.",
           "Verdicts are heuristics from target CPL (see skill ad-results); confirm before pausing anything.", "",
           fmt(g.sort_values("spend", ascending=False)[cols]), ""]
@@ -249,6 +328,22 @@ def main() -> int:
             f[c] = f[c].map(lambda x: "" if pd.isna(x) else f"{x:.1%}")
         f["frequency"] = f["frequency"].map(lambda x: "" if pd.isna(x) else f"{x:.2f}")
         md += ["## Fatigue (last 7 days vs the 7 before)", "", f.to_markdown(index=False), ""]
+    ret = retention(g, Path(args.render_dir) if args.render_dir else None)
+    if ret is not None:
+        r2 = ret.copy()
+        for q, _ in QUARTILES:
+            if q in r2:
+                r2[q] = r2[q].map(lambda x: "" if pd.isna(x) else f"{x:.0%}")
+        md += ["## Retention (share of 3-second viewers still watching)", "", r2.to_markdown(index=False), ""]
+    if args.impression_cap:
+        cap = impression_cap(g, args.impression_cap)
+        cols = [c for c in ("ad_name", "impressions", "hook_rate", "hold_rate", "ctr_link", "cpm", "fair_test_score") if c in cap]
+        md += [f"## Fair test at {args.impression_cap:,} impressions", "",
+               "Ads that reached the cap, best first on hook rate, hold, link CTR and CPM together. Pausing an ad at the cap needs Bruce's yes.", "",
+               fmt(cap[cols]) if len(cap) else "(no ad has reached the cap yet)", ""]
+        waiting = cap.attrs.get("waiting")
+        if waiting is not None and len(waiting):
+            md += ["Still below the cap: " + ", ".join(f"{a} ({int(i):,})" for a, i in zip(waiting["ad_name"], waiting["impressions"])), ""]
     (out / "ad_metrics.md").write_text("\n".join(md))
     print(f"Wrote {out / 'ad_metrics.md'} and ad_metrics.csv")
     return 0

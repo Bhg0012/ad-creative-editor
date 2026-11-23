@@ -63,6 +63,13 @@ DEFAULTS = {
     "tighten_keep": 0.12,      # silence left on each side of a tightened gap, seconds
     "voice_highpass_hz": 80,
     "voice_denoise": False,
+    "snap_cuts": 0.08,         # seconds a cut edge may move to land on the quietest 10 ms (0 disables)
+    "snap_floor_db": -40.0,    # dBFS that counts as quiet at a cut edge
+    "audio_crossfade": 0.02,   # half-width of the equal-power audio crossfade at every seam, seconds (0 = old fade-to-silence)
+    "voice_lowpass_hz": 15000,
+    "voice_compress": "light",  # light (2:1 at -20 dB) | medium (2.5:1 at -18 dB, the old setting) | off
+    "music_under_voice_lu": 20, # music bed sits this many LU under the voice (when gain_db is not set)
+    "music_voice_dip_db": 4,    # EQ dip in the voice presence band (around 2 kHz) on the music (house setting)
 }
 
 
@@ -193,7 +200,11 @@ def load_edl(path: Path, ratio_override: str | None = None) -> dict:
         if "at" not in b or "duration" not in b:
             raise SystemExit(f"broll {b['src']}: needs `at` and `duration`.")
     if edl.get("music"):
-        edl["music"]["path"] = resolve(edl["music"]["src"], edl_dir)
+        # `music` is one bed ({src, gain_db, duck, fade_out}) or a list of sections
+        # ([{src, at, until, src_in, gain_db, fade_in, fade_out}]) e.g. a suspense bed under the hook, then the main bed.
+        sections = edl["music"] if isinstance(edl["music"], list) else [edl["music"]]
+        for m in sections:
+            m["path"] = resolve(m["src"], edl_dir)
     for s in edl.get("sfx") or []:
         s["path"] = resolve(s["src"], edl_dir)
     return edl
@@ -311,6 +322,73 @@ def silences(path: Path, t_in: float, t_out: float, min_len: float, noise_db: fl
     for s, e in zip(starts, ends):
         out.append((t_in + max(s, 0.0), t_in + e))
     return out
+
+
+SNAP_RATE = 16000
+SNAP_WIN_S = 0.010   # 10 ms RMS frames
+
+
+def clip_rms(path: Path, t_in: float, t_out: float, margin: float = 0.3):
+    """10 ms RMS envelope (dBFS) of a clip's audio from t_in - margin to t_out + margin, plus its start time."""
+    import numpy as np
+
+    a0 = max(0.0, t_in - margin)
+    raw = subprocess.run([ffmpeg(), "-nostdin", "-v", "error", "-ss", f"{a0:.3f}", "-t", f"{(t_out + margin) - a0:.3f}", "-i", str(path),
+                          "-vn", "-ac", "1", "-ar", str(SNAP_RATE), "-f", "s16le", "-"], capture_output=True).stdout
+    a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+    win = int(SNAP_RATE * SNAP_WIN_S)
+    n = len(a) // win
+    if n < 3:
+        return None, a0
+    rms = np.sqrt(np.mean(a[: n * win].reshape(n, win) ** 2, axis=1))
+    return 20 * np.log10(np.maximum(rms, 1e-6)), a0
+
+
+def snap_edge(env, env_t0: float, t: float, kind: str, window: float, floor_db: float) -> float:
+    """Move a cut edge to the nearest quiet 10 ms frame, searching mostly outward (in-points earlier, out-points later)
+    so a cut never lands on the onset or tail of a word. Transcript word times drift +/-150 ms; the waveform does not."""
+    import numpy as np
+
+    if env is None:
+        return t
+    lo, hi = (t - window, t + window * 0.3) if kind == "in" else (t - window * 0.3, t + window)
+    i0 = max(0, int((lo - env_t0) / SNAP_WIN_S))
+    i1 = min(len(env), int((hi - env_t0) / SNAP_WIN_S) + 1)
+    if i1 - i0 < 2:
+        return t
+    seg = env[i0:i1]
+    # the frame at the edge itself: already quiet means nothing to fix
+    ic = int((t - env_t0) / SNAP_WIN_S)
+    if 0 <= ic < len(env) and env[ic] <= floor_db:
+        return t
+    j = int(np.argmin(seg))
+    if seg[j] > floor_db + 12:
+        return t   # no quiet spot nearby (continuous speech): leave it, QA will flag a hot seam
+    return round(env_t0 + (i0 + j + 0.5) * SNAP_WIN_S, 3)
+
+
+def cut_ranges(c: dict, keep: float, cfg: dict) -> list[tuple[float, float]]:
+    """The kept source ranges of one A-roll clip: pause tightening, filler skips, then edges snapped to the waveform."""
+    ranges = [(c["in"], c["out"])]
+    if c.get("still"):
+        return ranges
+    if c.get("tighten"):
+        ranges = tighten_ranges(c["in"], c["out"], silences(c["path"], c["in"], c["out"], float(c["tighten"])), keep)
+    ranges = apply_skips(ranges, c.get("skip"))
+    win = c.get("snap", (cfg.get("edit") or {}).get("snap_cuts", DEFAULTS["snap_cuts"]))
+    if win and c.get("astream") is not None and ranges:
+        env, t0 = clip_rms(c["path"], ranges[0][0], ranges[-1][1], margin=float(win) + 0.05)
+        floor = float((cfg.get("edit") or {}).get("snap_floor_db") or DEFAULTS["snap_floor_db"])
+        snapped = []
+        for a, b in ranges:
+            a2 = max(0.0, snap_edge(env, t0, a, "in", float(win), floor))
+            b2 = snap_edge(env, t0, b, "out", float(win), floor)
+            if snapped and a2 < snapped[-1][1]:
+                a2 = snapped[-1][1]
+            if b2 - a2 > 0.05:
+                snapped.append((a2, b2))
+        ranges = snapped or ranges
+    return ranges
 
 
 def apply_skips(ranges: list[tuple[float, float]], skips: list, pad: float = 0.03) -> list[tuple[float, float]]:
@@ -517,6 +595,53 @@ def render_end_card_html(card: dict, out: Path, out_w: int, out_h: int, fps: int
     run_ffmpeg(["-i", str(mov), "-f", "lavfi", "-t", f"{secs:.3f}", "-i", "anullsrc=r=48000:cl=stereo",
                 "-map", "0:v:0", "-map", "1:a:0", "-vf", "format=yuv420p", *enc, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
                 "-ac", "2", "-shortest", "-video_track_timescale", "90000", str(out)])
+
+
+def seam_audio(pieces: list[dict], total: float, out: Path, half: float) -> bool:
+    """Rebuild the A-roll audio from the source with an equal-power crossfade at every seam.
+
+    Each kept range is re-read with `half` seconds of handle on both sides (from the removed pause or the
+    neighbouring take), placed so the seam sits in the middle of the overlap, and faded in and out over
+    2 x half. Picture and lip sync are untouched (the overlap is centred on the cut); room tone never drops
+    to silence between segments, which is what made fade-to-zero cuts sound gated. Where a handle is not
+    available (start of a file, a still with no audio) that edge falls back to a short fade."""
+    live = [pc for pc in pieces if pc["has_audio"]]
+    if not live or half <= 0:
+        return False
+    args, chains = [], []
+    for i, pc in enumerate(pieces):
+        if not pc["has_audio"]:
+            continue
+        prev = pieces[i - 1] if i > 0 else None
+        nxt = pieces[i + 1] if i + 1 < len(pieces) else None
+        joined_prev = prev is not None and prev["has_audio"] and abs(prev["at"] + prev["dur"] - pc["at"]) < 0.02
+        joined_next = nxt is not None and nxt["has_audio"] and abs(pc["at"] + pc["dur"] - nxt["at"]) < 0.02
+        xl = min(half, pc["a"], (prev["src_dur"] - prev["a"] - prev["dur"]) if joined_prev else 0.0) if joined_prev else 0.0
+        xr = min(half, pc["src_dur"] - pc["a"] - pc["dur"], nxt["a"]) if joined_next else 0.0
+        pc["_xl"], pc["_xr"] = max(0.0, xl), max(0.0, xr)
+    # both sides of a seam must use the same half-width so the overlap stays centred on the cut
+    for i in range(len(pieces) - 1):
+        l, r = pieces[i], pieces[i + 1]
+        if l["has_audio"] and r["has_audio"] and "_xr" in l and "_xl" in r:
+            w = min(l["_xr"], r["_xl"])
+            l["_xr"] = r["_xl"] = w if w >= 0.005 else 0.0
+    k = 0
+    for pc in pieces:
+        if not pc["has_audio"]:
+            continue
+        xl, xr = pc["_xl"], pc["_xr"]
+        start, length = pc["a"] - xl, pc["dur"] + xl + xr
+        args += ["-ss", f"{start:.4f}", "-t", f"{length:.4f}", "-i", str(pc["path"])]
+        fin = f"afade=t=in:d={2 * xl:.4f}:curve=qsin" if xl > 0 else f"afade=t=in:d={CUT_FADE}"
+        fout_d = 2 * xr if xr > 0 else CUT_FADE
+        fout = f"afade=t=out:st={max(0.0, length - fout_d):.4f}:d={fout_d:.4f}" + (":curve=qsin" if xr > 0 else "")
+        delay = max(0, round((pc["at"] - xl) * 1000))
+        chains.append(f"[{k}:a]{AUD_NORM},atrim=0:{length:.4f},asetpts=PTS-STARTPTS,{fin},{fout},adelay=delays={delay}:all=1[p{k}]")
+        k += 1
+    mix = "".join(f"[p{i}]" for i in range(k))
+    fc = ";".join(chains) + f";{mix}amix=inputs={k}:normalize=0:duration=longest,apad,atrim=0:{total:.4f}[a]"
+    run_ffmpeg([*args, "-filter_complex", fc, "-map", "[a]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(out)])
+    return True
 
 
 def concat(segments: list[Path], out: Path, tmp: Path) -> None:
@@ -826,8 +951,19 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
             r = pl.Renderer(out_w, out_h)
             try:
                 for n, sp in enumerate(specs):
-                    mov = tmp / f"plate_{n:02d}_{sp['type']}.mov"
-                    r.render_mov(pl.build_html(sp, out_w, out_h, cfg), float(sp["duration"]), fps, mov)
+                    page = pl.build_html(sp, out_w, out_h, cfg)
+                    # Cache by the exact page (fonts and images are inlined, so any change changes the key): a revision
+                    # re-renders only the graphics that changed (Jason Cooperson, V19: render just the part you changed).
+                    import hashlib  # noqa: WPS433
+
+                    key = hashlib.md5(f"{page}|{float(sp['duration']):.3f}|{fps}|{out_w}x{out_h}".encode()).hexdigest()[:16]
+                    cache = tmp.parent.parent / "cache" / "plates"
+                    mov = cache / f"{sp['type']}_{key}.mov"
+                    if not mov.exists():
+                        cache.mkdir(parents=True, exist_ok=True)
+                        part = cache / f".{mov.stem}.part.mov"
+                        r.render_mov(page, float(sp["duration"]), fps, part)
+                        part.replace(mov)
                     at, dur = float(sp["at"]), float(sp["duration"])
                     inputs += ["-i", str(mov)]
                     vchain.append(f"[{idx}:v]format=rgba,setpts=PTS-STARTPTS+{at:.3f}/TB[p{n}]")
@@ -898,23 +1034,73 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
     voice = [f"highpass=f={hp}"]
     if (cfg.get("audio") or {}).get("voice_denoise", DEFAULTS["voice_denoise"]):
         voice.append("afftdn=nf=-25")
-    voice += ["acompressor=threshold=-18dB:ratio=2.5:attack=5:release=80:makeup=2", "deesser"]
+    acfg = cfg.get("audio") or {}
+    lp = int(acfg.get("voice_lowpass_hz", DEFAULTS["voice_lowpass_hz"]) or 0)
+    if lp:
+        voice.append(f"lowpass=f={lp}")   # the voice lives between about 80 Hz and 12-16 kHz (Gavin Herman, V6)
+    comp = str(acfg.get("voice_compress") or DEFAULTS["voice_compress"])
+    if comp == "medium":
+        voice.append("acompressor=threshold=-18dB:ratio=2.5:attack=5:release=80:makeup=2")
+    elif comp != "off":
+        voice.append("acompressor=threshold=-20dB:ratio=2:attack=5:release=80:makeup=2")   # light: 2:1 at the speech floor (V6)
+    voice.append("deesser")
+    timeline["audio"] = {"voice_compress": comp, "voice_lowpass_hz": lp}
     mix_inputs = []
-    music = edl.get("music") if not proxy else None
+    music_raw = edl.get("music") if not proxy else None
+    sections = (music_raw if isinstance(music_raw, list) else [music_raw]) if music_raw else []
+    music = sections[0] if sections else None
     if music:
         achain.append(f"[0:a]{','.join(voice)},asplit=2[vo][vokey]")
-        inputs += ["-stream_loop", "-1", "-i", str(music["path"])]
-        gain = float(music.get("gain_db") if music.get("gain_db") is not None else DEFAULTS["music_gain_db"])
-        fade = float(music.get("fade_out") if music.get("fade_out") is not None else DEFAULTS["music_fade_out"])
-        m = (f"[{idx}:a]{AUD_NORM},atrim=0:{total:.3f},asetpts=PTS-STARTPTS,volume={gain}dB,"
-             f"afade=t=out:st={max(0.0, total - fade):.3f}:d={fade:.3f}[m0]")
-        achain.append(m)
+        lu = acfg.get("music_under_voice_lu", DEFAULTS["music_under_voice_lu"])
+        voice_i = None
+        if lu is not None and any(m.get("gain_db") is None for m in sections):
+            try:
+                voice_i = float(measure_loudnorm(aroll, -16, -1.5)["input_i"])
+            except (RuntimeError, KeyError, ValueError):
+                voice_i = None
+        dip = float(acfg.get("music_voice_dip_db", DEFAULTS["music_voice_dip_db"]) or 0)
+        parts, levels = [], []
+        for n, m in enumerate(sections):
+            at = float(m.get("at") or 0.0)
+            until = min(total, float(m.get("until") or total))
+            if until - at <= 0.05:
+                continue
+            src_in = float(m.get("src_in") or 0.0)
+            inputs += ["-stream_loop", "-1", "-ss", f"{src_in:.3f}", "-i", str(m["path"])]
+            if m.get("gain_db") is not None:
+                gain = float(m["gain_db"])
+            elif voice_i is not None and voice_i > -70:
+                try:
+                    mus_i = float(measure_loudnorm(m["path"], -16, -1.5)["input_i"])
+                    gain = round((voice_i - float(lu)) - mus_i, 2)   # bed sits `lu` LU under the voice, whatever the track's own level
+                except (RuntimeError, KeyError, ValueError):
+                    gain = DEFAULTS["music_gain_db"]
+            else:
+                gain = DEFAULTS["music_gain_db"]
+            last = until >= total - 0.05
+            fout = float(m.get("fade_out") if m.get("fade_out") is not None else (DEFAULTS["music_fade_out"] if last else 0.4))
+            fin = float(m.get("fade_in") if m.get("fade_in") is not None else (0.0 if at <= 0.01 else 0.3))
+            length = until - at
+            chain = (f"[{idx}:a]{AUD_NORM},atrim=0:{length:.3f},asetpts=PTS-STARTPTS,volume={gain}dB"
+                     + (f",equalizer=f=2000:t=q:w=1.2:g=-{dip}" if dip else "")
+                     + (f",afade=t=in:d={fin:.3f}" if fin > 0 else "")
+                     + f",afade=t=out:st={max(0.0, length - fout):.3f}:d={fout:.3f}"
+                     + f",adelay=delays={round(at * 1000)}:all=1[ms{n}]")
+            achain.append(chain)
+            parts.append(f"[ms{n}]")
+            levels.append({"src": m["src"], "at": at, "until": round(until, 3), "gain_db": gain})
+            idx += 1
+        if len(parts) == 1:
+            achain.append(f"{parts[0]}apad,atrim=0:{total:.3f}[m0]")
+        else:
+            achain.append(f"{''.join(parts)}amix=inputs={len(parts)}:normalize=0:duration=longest,apad,atrim=0:{total:.3f}[m0]")
+        timeline["music"] = {"sections": levels, "under_voice_lu": lu if voice_i is not None else None,
+                             "voice_lufs": round(voice_i, 1) if voice_i is not None else None}
         if music.get("duck", DEFAULTS["duck"]):
             achain.append("[m0][vokey]sidechaincompress=threshold=0.015:ratio=10:attack=15:release=350:level_sc=1:makeup=1[mus]")
         else:
             achain.append("[m0]anull[mus];[vokey]anullsink")
         mix_inputs = ["[vo]", "[mus]"]
-        idx += 1
     else:
         achain.append(f"[0:a]{','.join(voice)}[vo]")
         mix_inputs = ["[vo]"]
@@ -932,6 +1118,7 @@ def composite(aroll: Path, edl: dict, out: Path, out_w: int, out_h: int, fps: in
                 continue
             custom = ROOT / "audio" / "sfx" / f"{name}.wav"
             sfx_list.append({"path": custom if custom.exists() else defaults.get(name, defaults["pop"]), "at": float(sp["at"]), "gain_db": gain, "src": name})
+    timeline["sfx"] = [{"at": round(float(s["at"]), 3), "name": str(s.get("src") or Path(str(s["path"])).stem)} for s in sfx_list]
     for n, s in enumerate(sfx_list):
         inputs += ["-i", str(s["path"])]
         at_ms = int(round(float(s["at"]) * 1000))
@@ -1088,10 +1275,7 @@ def timeline_of(edl_path: Path, ratio: str | None = None) -> list[dict]:
     keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
     out, t = [], 0.0
     for c in edl["clips"]:
-        ranges = [(c["in"], c["out"])]
-        if c.get("tighten") and not c["still"]:
-            ranges = tighten_ranges(c["in"], c["out"], silences(c["path"], c["in"], c["out"], float(c["tighten"])), keep)
-        ranges = apply_skips(ranges, c.get("skip"))
+        ranges = cut_ranges(c, keep, cfg)
         for a, b in ranges:
             out.append({"src": c["src"], "src_in": round(a, 3), "src_out": round(b, 3), "at": round(t, 3), "duration": round(b - a, 3)})
             t += b - a
@@ -1118,6 +1302,10 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         info = probe(c["path"])
         c["vstream"] = video_stream(info)
         c["astream"] = audio_stream(info)
+        try:
+            c["_src_dur"] = float(info["format"]["duration"])
+        except (KeyError, ValueError, TypeError):
+            c["_src_dur"] = None
         if c["vstream"] is None:
             raise SystemExit(f"{c['src']}: no video stream")
 
@@ -1141,6 +1329,7 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
     try:
         segments, t = [], 0.0
         timeline_clips = []
+        pieces = []
         keep = float((cfg.get("edit") or {}).get("tighten_keep") or DEFAULTS["tighten_keep"])
         backdrop = None
         panel = None
@@ -1176,16 +1365,14 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
             if focus == "auto":
                 focus = auto_focus(c["path"], c["in"], c["out"])
             focus = (float(focus[0]), float(focus[1]))
-            ranges = [(c["in"], c["out"])]
-            if c.get("tighten") and not c["still"]:
-                gaps = silences(c["path"], c["in"], c["out"], float(c["tighten"]))
-                ranges = tighten_ranges(c["in"], c["out"], gaps, keep)
-            ranges = apply_skips(ranges, c.get("skip"))
+            ranges = cut_ranges(c, keep, cfg)
             for k, (a, b) in enumerate(ranges):
                 seg = tmp / f"seg_{n:02d}_{k:02d}.mp4"
                 render_segment(c, a, b, seg, ratio, out_w, out_h, fps, enc, focus,
                                timecode_from=t if proxy else None, font=font, backdrop=backdrop, panel=panel)
                 d = duration_of(seg)
+                pieces.append({"path": c["path"], "a": a, "dur": d, "at": t, "has_audio": (not c["still"]) and c["astream"] is not None,
+                               "src_dur": c.get("_src_dur") or 1e9})
                 timeline_clips.append({"src": c["src"], "src_in": round(a, 3), "src_out": round(b, 3),
                                        "at": round(t, 3), "duration": round(d, 3), "focus": [round(focus[0], 3), round(focus[1], 3)],
                                        "zoom": c.get("zoom") or 1.0, "push": c.get("push"), "layout": c.get("layout") or "full"})
@@ -1205,6 +1392,14 @@ def render(edl_path: Path, ratio: str | None, captions_arg: str | None, proxy: b
         aroll = tmp / "aroll.mp4"
         concat(segments, aroll, tmp)
         total = duration_of(aroll)
+        xf = float((cfg.get("edit") or {}).get("audio_crossfade", DEFAULTS["audio_crossfade"]) or 0)
+        if xf > 0 and len(pieces) > 1:
+            wav = tmp / "seam_audio.wav"
+            if seam_audio(pieces, total, wav, xf):
+                joined = tmp / "aroll_xf.mp4"
+                run_ffmpeg(["-i", str(aroll), "-i", str(wav), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+                            "-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-ac", "2", "-shortest", "-movflags", "+faststart", str(joined)])
+                aroll = joined
 
         comp = tmp / "comp.mov"
         timeline = composite(aroll, edl, comp, out_w, out_h, fps, total, cfg, font, tmp, enc, proxy)

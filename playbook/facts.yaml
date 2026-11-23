@@ -49,7 +49,11 @@ facts:
     shelf_life_days: 180
     confidence: high
     applies_as: rule
-    notes: 1080x1920 is accepted. Render 1440x2560 when the source footage is at least 1440 px wide; never upscale soft footage to fake it.
+    notes: >
+      1080x1920 is accepted. Render 1440x2560 when the source footage is at least 1440 px wide; never upscale soft footage to fake it.
+      Lead-in length: about 44 characters is roughly the first 7-8 words, which must carry the
+      hook on Reels. Sabri Suby's "first 11 or 14 words" (youtube.com/watch?v=QN_LVgvik-k) fits
+      Feed's "See more" cut, not Reels.
 
   - id: feed_video_specs
     topic: specs
@@ -110,6 +114,11 @@ facts:
       "Entity ID" is practitioner shorthand, not an official Meta term. Specific similarity
       thresholds quoted online (e.g. 40% / 60%) have no Meta source; do not cite them.
       Some accounts report a "creative similarity" indicator in Ads Manager; check yours.
+      Training pass 2026-11-23: three practitioners say the creative is now the targeting
+      (casting, setting, opening problem, tone and long copy tell delivery who the ad is for):
+      Sabri Suby (youtube.com/watch?v=NTmWqnPIb2s), Alessio Cordeddu (youtube.com/watch?v=6E7AzoOxHxQ),
+      Sergio C (youtube.com/watch?v=rBD9xJswb5k). Supports broad targeting plus clear trade and
+      city cues in the creative. Practitioner claims, not Meta documentation.
 
   - id: creative_volume
     topic: algorithm
@@ -435,7 +444,12 @@ facts:
     shelf_life_days: 60
     confidence: low
     applies_as: heuristic
-    notes: Single vendor, ecommerce sample. Consistent with creative_similarity and creative_volume.
+    notes: >
+      Single vendor, ecommerce sample. Consistent with creative_similarity and creative_volume.
+      Training pass 2026-11-23: Ben Heath relays Hormozi's view that there is no cap ("20, 30, 50";
+      youtube.com/watch?v=oTWfDI_91Fs) for accounts that can produce and fund that volume; Professor
+      Charley T's small-account fallback is "one ad set with four to eight ads total"
+      (youtube.com/watch?v=4DutxlMzqgc). Keep 4-8 at Bruce's budget.
 
   - id: creative_fatigue
     topic: algorithm
@@ -454,4 +468,112 @@ facts:
     shelf_life_days: 60
     confidence: low
     applies_as: heuristic
-    notes: Thresholds differ by source; calibrate to the account after the first batch.
+    notes: >
+      Thresholds differ by source; calibrate to the account after the first batch. Training pass
+      2026-11-23: frequency is never the signal alone. Sabri Suby: "if you're anything under three,
+      there is absolutely no way that this thing has fatigued" (youtube.com/watch?v=QN_LVgvik-k);
+      Professor Charley T: early frequency drops as an ad leaves learning and moves up the funnel,
+      and most "fatigue" is not fatigue (youtube.com/watch?v=4DutxlMzqgc). Use frequency together
+      with falling CTR and rising CPM. Do not encode Charley's "1.6 frequency means 60% saw it
+      twice in a day"; frequency is an average. Refresh order when a winner fades: visual first,
+      then headline, then body copy (Suby).
+
+  - id: instant_form_disqualify
+    topic: lead_quality
+    claim: >
+      Instant Forms support conditional logic on a multiple-choice question; an answer can route
+      to a closing screen for non-leads, so the person does not submit and does not register as a
+      lead, and Meta stops optimizing toward them. Higher intent forms can require phone
+      verification by one-time passcode. Left alone, Meta drifts to the cheapest leads; the effect
+      is small on day 1 and compounds over 30-90 days.
+    sources:
+      - url: https://www.youtube.com/watch?v=oTWfDI_91Fs
+        publisher: Ben Heath (YouTube, Sep 2026), shown in the Ads Manager form builder
+    verified_on: 2026-11-23
+    shelf_life_days: 90
+    confidence: low
+    applies_as: default
+    notes: >
+      Single practitioner. Confirm both options in Bruce's form builder before relying on them.
+      Fewer counted leads slows learning (learning_phase): disqualify only clear non-fits (wrong
+      market, not the owner, a trade not served). Report cost per qualified lead.
+
+  - id: small_budget_fair_test
+    topic: algorithm
+    claim: >
+      On small budgets (about $30-100/day) a CBO with many ads concentrates 80-90% of spend on one
+      or two ads and starves the rest, and the ads delivery does not favor are sometimes the real
+      winners. Practitioner fix: cap each ad at 1,000 (minimum) to 3,000 impressions, compare CTR
+      (all), link CTR and CPM at equal exposure, keep 2-5 performers, then scale only those.
+      "You graduate into volume as the account grows."
+    sources:
+      - url: https://www.youtube.com/watch?v=rBD9xJswb5k
+        publisher: Sergio C (YouTube, Aug 2026)
+    verified_on: 2026-11-23
+    shelf_life_days: 60
+    confidence: low
+    applies_as: heuristic
+    notes: >
+      E-commerce examples (ROAS). For lead gen use the cap as an upstream pre-screen only; at that
+      sample each ad has 0-4 leads, too few to judge CPL. Sabri Suby agrees spend share is not a
+      verdict (youtube.com/watch?v=QN_LVgvik-k). Manual pauses need Bruce's approval.
+
+  - id: protect_working_campaign
+    topic: delivery
+    claim: >
+      Two practitioners agree: when a campaign is hitting target, do not add new ads to it; test new
+      creative in a separate test ad set or side campaign and graduate only ads that beat the
+      current ones. New ads start with no data and draw delivery from existing ads while learning,
+      so the incumbents look worse temporarily.
+    sources:
+      - url: https://www.youtube.com/watch?v=4DutxlMzqgc
+        publisher: Professor Charley T (YouTube, Aug 2026)
+      - url: https://www.youtube.com/watch?v=rBD9xJswb5k
+        publisher: Sergio C (YouTube, Aug 2026)
+    verified_on: 2026-11-23
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: default
+    notes: >
+      The "new ads are tested on the warmest audience first" mechanism is Charley's claim, not Meta
+      documentation. If the budget cannot fund a side test at the publish minimum
+      (meta_news_2026_11), swap losers out in one batched edit. Reuse post IDs when moving a proven ad.
+
+  - id: evaluation_window
+    topic: delivery
+    claim: >
+      Practitioners advise no significant decisions inside one day; judge on 7-day rolling
+      averages and require at least 7 days of data before pausing or crowning an ad. Before
+      blaming an ad, check account-wide CPM and CTR for a market-wide shift (season, big events).
+    sources:
+      - url: https://www.youtube.com/watch?v=QN_LVgvik-k
+        publisher: Sabri Suby (YouTube, Sep 2026)
+      - url: https://www.youtube.com/watch?v=4DutxlMzqgc
+        publisher: Professor Charley T (YouTube, Aug 2026)
+    verified_on: 2026-11-23
+    shelf_life_days: 60
+    confidence: medium
+    applies_as: default
+    notes: >
+      Replaces the 3-4 day minimum in launch.md. On a small budget the spend threshold usually
+      arrives after 7 days anyway. Local events to check (inference): SEC football Saturdays, the
+      Iron Bowl, storm weeks for roofers.
+
+  - id: flexible_ad_322
+    topic: algorithm
+    claim: >
+      A flexible ad holding 3 creatives (same format, same aspect ratio), 2 primary texts and 2
+      headlines gives 12 combinations in one data bucket; per-combination results are not
+      reported, so judge the flexible ad as one unit. Texts and headlines must be meaningfully
+      different angles, not rewordings. Flexible replaced dynamic creative.
+    sources:
+      - url: https://www.youtube.com/watch?v=4DutxlMzqgc
+        publisher: Professor Charley T (YouTube, Aug 2026)
+    verified_on: 2026-11-23
+    shelf_life_days: 60
+    confidence: low
+    applies_as: heuristic
+    notes: >
+      Single practitioner. meta_news_2026_11 reports per-asset (not per-combination) reporting
+      added in Nov 2026; both can be true. Check in Ads Manager how a flexible ad treats 9:16 and
+      4:5 versions before mixing ratios.

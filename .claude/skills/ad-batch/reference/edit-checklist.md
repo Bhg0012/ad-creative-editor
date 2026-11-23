@@ -16,6 +16,9 @@ What a trained editor checks by reflex. The tools catch most of it; this is the 
 - [ ] No B-roll or picture-in-picture covers the speaker's face during the hook or the CTA.
 - [ ] QA seam checks clean: no click at a cut, no repeated word across a cut (a surviving retake), no breathy lull over 0.5 s. Fix in the EDL (`tighten`, move the cut, cover with a card), never by hand.
 - [ ] Punches (if any) land on the stressed word, at most 3-5 per 30 s.
+- [ ] QA "cut lands in speech" clean: no seam where the audio is hot on both sides. If flagged, move the cut or raise `snap_cuts` for that clip.
+- [ ] QA "pacing" clean: no gap over 4 s without a visual event in the first 10 s, or over 6 s after; SFX not denser than one per 2 s, never two within 0.4 s.
+- [ ] Hook payoff: a hook that promised structure ("3 truths") structures the body and pays off before the CTA (Fraser Cottrell, V10).
 
 ## Text and graphics
 - [ ] Every text element sits inside the safe zone (QA geometry) and is readable at 360 px wide.
@@ -31,6 +34,8 @@ What a trained editor checks by reflex. The tools catch most of it; this is the 
 - [ ] Music under the voice at all times (duck audible), stops or fades on the end card, never a hard stop.
 - [ ] SFX below the voice, used sparingly, on a visual event.
 - [ ] Loudness within target (QA), true peak at or under -1 dBTP.
+- [ ] Music level read from `render.json` (`music.under_voice_lu`): the bed is barely there under speech. Voice does not sound over-compressed.
+- [ ] QA "audio and video same length" passes.
 - [ ] Sound-off test: the ad makes complete sense muted. Eyes-closed test: the audio alone makes sense.
 
 ## Truth and compliance
@@ -38,7 +43,14 @@ What a trained editor checks by reflex. The tools catch most of it; this is the 
 - [ ] Compliance checklist in `reference/compliance.md` passed line by line.
 - [ ] Message match: video promise, copy, CTA and destination all say the same thing.
 
+## Statics
+- [ ] One-second test at 360 px; hook biggest, then trade and city, then offer, then proof.
+- [ ] At most 3 text elements and 2 stacked concepts; headline on two lines with one highlighted word.
+- [ ] Any quote, screenshot or number is real and permitted.
+
 ## Before the gate
+- [ ] Fresh-eyes review ran (SKILL.md Stage 6) and every timestamped defect it found is fixed or answered.
+- [ ] Session log in `BATCH.md` updated: what was tried in this render pass, what worked, what to avoid.
 - [ ] Proxy or final watched end to end once at phone size.
 - [ ] `exports/<ad>.render.json` matches the EDL (nothing silently skipped).
 - [ ] Notes from the previous gate are all applied and logged in `LEARNINGS.md`.
