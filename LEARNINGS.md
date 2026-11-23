@@ -24,6 +24,11 @@ Format for each entry:
 
 ## Log
 
+- **2026-11-23 | engine | self-caught process failure**
+  - What happened: after the 20-video training pass, the full test run reported 1 failed, 61 passed, and the merge into main went ahead because only the last line of output (the exit code of `tail`) was checked. The failing test was real: a synthesized click sound produced a -0.6 dBTP peak after AAC encoding, over the -1.0 ceiling.
+  - Why it matters: Bruce's standing order is never merge red; a peak over the ceiling can be flagged or squashed by Meta.
+  - Rule going forward: before any merge, read the pytest summary line itself ("N passed" with no "failed"), not the exit code of a pipe. Fixed the cause: softer click attack, limiter ceiling 1.0 dB under the true-peak maximum.
+
 - **2026-11-17 | engine | Bruce's correction**
   - What happened: the naming convention had no price part; price variants were being folded into the angle part.
   - Why it matters: Bruce sorts and judges ads by offer price first; a buried price makes the upload folder and the results table hard to read.

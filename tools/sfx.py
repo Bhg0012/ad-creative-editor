@@ -19,7 +19,7 @@ RECIPES = {
     # short soft pop: a quick sine blip with a fast decay
     "pop": ("sine=frequency=520:sample_rate=48000:duration=0.18", "afade=t=in:d=0.004,afade=t=out:st=0.03:d=0.15,volume=0.8"),
     # click: filtered noise burst, very short
-    "click": ("anoisesrc=c=white:r=48000:a=0.6:d=0.06", "highpass=f=1800,afade=t=out:st=0.005:d=0.05,volume=0.7"),
+    "click": ("anoisesrc=c=white:r=48000:a=0.6:d=0.06", "highpass=f=1800,lowpass=f=9000,afade=t=in:d=0.002,afade=t=out:st=0.005:d=0.05,volume=0.7"),
     # whoosh: pink noise with a band sweep and fade
     "whoosh": ("anoisesrc=c=pink:r=48000:a=0.9:d=0.45", "afade=t=in:d=0.12,afade=t=out:st=0.2:d=0.25,highpass=f=400,lowpass=f=5000,volume=0.9"),
     # ding: two partials with a long decay
