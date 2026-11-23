@@ -30,6 +30,21 @@ Write to `brief/10_launch.md`. Check every point against `playbook/facts.yaml` f
 - [ ] Destination tested on a phone: form submits, booking link works, thank-you screen shows.
 - [ ] Copy matches video (message match) and the compliance checklist passed.
 
+## Staging the campaign through the Meta Ads MCP (only on Bruce's yes)
+
+The Meta Ads MCP can build the whole campaign as a draft in Ads Manager. Nothing goes live and nothing spends until it is published. This is a write to Bruce's ad account, so it needs his explicit yes in this session for this batch, after he has seen `brief/10_launch.md`.
+
+What Bruce sets up once, by hand, because the MCP cannot: the Instant Form (it attaches an existing form by ID, it cannot build one), the Lead Ads Terms of Service on the Page, and the Pixel or CRM connection.
+
+Order:
+1. Read the account: `ads_get_ad_accounts` (currency, `min_daily_budget_cents`), `ads_get_ad_account_pages` (Page ID, `leadgen_tos_accepted`), `ads_get_ig_accounts` (Instagram ID, required for Reels delivery).
+2. Upload each video from `deliver/`: `ads_create_upload_url` (name, size, MIME), upload with curl, `ads_finalize_upload`, then poll `ads_get_ad_videos` until the status is ready. Up to 500 MiB per file. This runs where the files are, so it happens in a session on Bruce's Mac, not in the cloud.
+3. `ads_create_campaign`: objective `OUTCOME_LEADS`, the budget Bruce stated (never inferred), campaign-level budget unless he asks otherwise.
+4. `ads_create_ad_set`: one per market, broad geo targeting on the real service radius, Advantage+ audience and placements unless the plan says otherwise, the lead goal from the plan.
+5. Per video: `ads_create_creative` with the Page and Instagram IDs, the video ID, `primary_texts`, `headlines` and the CTA from `exports/<adname>_copy.md`, the lead form ID or link, URL parameters for tracking, and `self_ai_disclosure` exactly as Bruce decided (never set it for him). Then `ads_create_ad` with the ad name equal to the file name.
+6. Read back every object with `ads_get_ad_entities` (draft state) and fix every blocking error. Report which Advantage+ creative enhancements Meta switched on by default, so Bruce can turn off any not under test.
+7. Stop. Bruce reviews the draft in Ads Manager and publishes it himself, or says "publish" and the campaign is published with `ads_activate_entity`. Publishing starts spending.
+
 ## Kill / keep rules (derive numbers from target_cpl)
 
 Evaluate an ad only after BOTH a spend threshold and a minimum run time (e.g. 2x target CPL and 3-4 days), whichever comes later. `tools/metrics.py --target-cpl` applies these defaults:

@@ -159,7 +159,7 @@ For every ad, write `exports/<adname>_copy.md` per `reference/copy-package.md`. 
 
 ## Stage 9: launch plan
 
-Write `brief/10_launch.md` per `reference/launch.md`: structure, budget sanity check against the learning phase, the pre-publish settings audit (Advantage+ creative enhancements, AI disclosure, placements), naming, and kill/keep rules with numbers derived from `target_cpl`. After launch, results go through `/ad-results`.
+Write `brief/10_launch.md` per `reference/launch.md`: structure, budget sanity check against the learning phase, the pre-publish settings audit (Advantage+ creative enhancements, AI disclosure, placements), naming, and kill/keep rules with numbers derived from `target_cpl`. On Bruce's explicit yes, stage the whole campaign as an Ads Manager draft through the Meta Ads MCP (`reference/launch.md`, "Staging the campaign"): uploads, campaign, ad sets, one ad per video with its copy and name. Never publish without a second, separate yes. After launch, results go through `/ad-results`.
 
 ## Naming convention
 
