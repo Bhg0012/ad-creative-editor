@@ -306,25 +306,40 @@ facts:
     confidence: medium
     applies_as: default
 
-  - id: meta_news_2026_10
+  - id: meta_news_2026_11
     topic: news
     claim: >
-      October 2026: Advantage+ creative image-to-video became a default; Ads Creative Studio
-      rollout widened (edit hooks, audio, clip length, captions, end scenes); a business AI
-      assistant that edits campaigns is in testing; per-creative audiences opened to Marketing
-      API partners (Oct 19); updated Commercial and Self-Serve Ad Terms reported to take effect
-      Oct 30, 2026, including advertiser responsibility for AI-generated content.
+      November 2026 (third-party roundups, not yet confirmed on Meta's own pages): Ads Manager
+      reports performance per individual image, video and text variation (Creative > Media, and
+      Dynamic creative element), some figures estimated; Advantage+ Creative gained Image
+      Animation (static photo to Reels-ready video) and Muse Image is being added; Ads Manager
+      refuses to publish a new or duplicated campaign whose budget is below an objective- and
+      country-specific minimum; with Advantage+ Audience off, each creative in an ad set can carry
+      its own age range and gender; the Pixel can match some conversions from on-device customer
+      data (on by default for eligible pixels from about Nov 12), so reported results may shift
+      with no creative change; Marketing API v24.0 retired Nov 10. The Nov 20 Commercial Terms
+      update (advertiser solely responsible for AI-generated creative) is reported as effective by
+      one source and paused by another.
     sources:
-      - url: https://techhubinsight.com/meta-ai-ad-tools-advertising-week-2026/
-        publisher: TechHub Insight
-      - url: https://adsuploader.com/blog/meta-ads-updates
-        publisher: AdsUploader
-      - url: https://ppc.land/metas-per-creative-audiences-force-ad-sets-to-stay-open-to-all-genders/
-        publisher: PPC Land
-    verified_on: 2026-10-22
+      - url: https://sociallyaligned.com/meta-ads-updates-november-2026/
+        publisher: Socially Aligned
+      - url: https://adadvisor.ai/blog/meta-ads-updates-2026
+        publisher: AdAdvisor
+      - url: https://commonthreadco.com/blogs/coachs-corner/meta-ads-changes-2026
+        publisher: Common Thread Collective
+      - url: https://margabagus.com/meta-ads-update-november-2026/
+        publisher: Marga Bagus
+    verified_on: 2026-11-23
     shelf_life_days: 30
     confidence: low
     applies_as: context
+    notes: >
+      Replaces meta_news_2026_10 (October items: image-to-video default, Ads Creative Studio
+      rollout, per-creative audiences for API partners, Oct 30 ad terms). For Bruce's batches
+      the two that matter: per-creative reporting makes the variants matrix readable in Ads
+      Manager without a spreadsheet, and the budget minimum can block a small test campaign at
+      publish time, so check it in the launch plan. Treat every item as a hint until seen in
+      Ads Manager or the Business Help Center.
 
   - id: hormozi_vibe_editing_ads
     topic: news
