@@ -82,6 +82,13 @@ data:
   past_ads_export: ./data/     # CSV exports from Ads Manager if no connector
   target_cpl: TBD              # your break-even or goal cost per lead, in USD
 
+delivery:
+  # Where finished ads also get copied after tools/deliver.py sorts them. Google Drive for desktop
+  # shows Drive as a folder on the Mac; the * matches the account folder so no email lives here.
+  # Only exports, statics and MANIFEST.csv go; raw footage and work files never leave the repo.
+  # Leave empty to keep everything in batches/<id>/deliver only.
+  copy_to: ""                  # e.g. "~/Library/CloudStorage/GoogleDrive-*/My Drive/AuburnSEO Ads"
+
 batch_defaults:
   number_of_finished_ads: 6    # 5-10 genuinely different concepts
   lengths_seconds: [15, 30, 45]

@@ -9,9 +9,18 @@ plus deliver/MANIFEST.csv with one row per file: name, market, offer, price, ang
 ratio, version, duration, size, and the ad copy file if one exists. Use the same name as the ad
 name in Ads Manager; tools/metrics.py groups results by these parts later.
 
+Copy to Google Drive (or any synced folder): set `delivery.copy_to` in config.yaml, e.g.
+    delivery:
+      copy_to: "~/Library/CloudStorage/GoogleDrive-*/My Drive/AuburnSEO Ads"
+The `*` matches your Google account folder, so no email address lives in the repo. Each run copies
+the sorted deliver/ tree to <copy_to>/<batch id>/, MANIFEST.csv included. Only finished files go;
+raw footage and work files never leave the repo folder. `--to <folder>` overrides the config for one
+run; `--no-copy` skips it.
+
 Usage:
     .venv/bin/python tools/deliver.py batches/<id>
     .venv/bin/python tools/deliver.py batches/<id> --by ratio      # deliver/<ratio>/<market>/<offer>/<price>/
+    .venv/bin/python tools/deliver.py batches/<id> --to "~/Desktop/ads"
 """
 from __future__ import annotations
 
@@ -22,7 +31,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import parse_ad_name, probe  # noqa: E402
+from common import load_config, parse_ad_name, probe  # noqa: E402
 
 
 def parse_name(stem: str) -> dict | None:
@@ -64,13 +73,61 @@ def deliver(batch: Path, by: str = "market") -> list[dict]:
     return rows
 
 
+def resolve_copy_to(pattern: str) -> Path:
+    """Expand ~ and one glob (the Google account folder) into a real, existing folder."""
+    import glob
+
+    expanded = str(Path(pattern).expanduser())
+    if any(ch in expanded for ch in "*?["):
+        # glob the deepest existing prefix that contains the wildcard, keep the rest as plain folders
+        parts = Path(expanded).parts
+        for i in range(len(parts), 0, -1):
+            head = str(Path(*parts[:i]))
+            if any(ch in head for ch in "*?["):
+                hits = sorted(glob.glob(head))
+                if hits:
+                    if len(hits) > 1:
+                        print(f"note: {len(hits)} folders match {head}; using {hits[0]}")
+                    return Path(hits[0]).joinpath(*parts[i:])
+        raise SystemExit(f"copy_to {pattern!r}: no folder matches. Is Google Drive for desktop running and signed in?")
+    return Path(expanded)
+
+
+def copy_out(batch: Path, dest_root: Path) -> Path:
+    """Mirror batches/<id>/deliver into <dest_root>/<batch id>/ (only finished files)."""
+    src = batch / "deliver"
+    if not src.exists():
+        raise SystemExit("nothing to copy: run deliver first")
+    base = dest_root.parent if dest_root.name else dest_root
+    if not base.exists():
+        raise SystemExit(f"{base} does not exist. Is Google Drive for desktop running and signed in?")
+    dest = dest_root / batch.resolve().name
+    dest.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for f in src.rglob("*"):
+        if f.is_file():
+            t = dest / f.relative_to(src)
+            t.parent.mkdir(parents=True, exist_ok=True)
+            if not t.exists() or t.stat().st_size != f.stat().st_size or t.stat().st_mtime < f.stat().st_mtime:
+                shutil.copy2(f, t)
+                n += 1
+    print(f"copied {n} new or changed files to {dest}")
+    return dest
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("batch")
     ap.add_argument("--by", default="market", choices=("market", "ratio", "offer"), help="top-level folder")
+    ap.add_argument("--to", help="copy the sorted folders here too (overrides delivery.copy_to in config.yaml)")
+    ap.add_argument("--no-copy", action="store_true", help="skip the copy to Google Drive for this run")
     args = ap.parse_args()
-    rows = deliver(Path(args.batch), args.by)
-    print(f"{len(rows)} files sorted into {Path(args.batch) / 'deliver'} (MANIFEST.csv alongside)")
+    batch = Path(args.batch)
+    rows = deliver(batch, args.by)
+    print(f"{len(rows)} files sorted into {batch / 'deliver'} (MANIFEST.csv alongside)")
+    target = args.to or str(((load_config().get("delivery") or {}).get("copy_to")) or "")
+    if target and not args.no_copy:
+        copy_out(batch, resolve_copy_to(target))
     return 0
 
 

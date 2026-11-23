@@ -60,7 +60,7 @@ Batches live in `batches/<date>_<market>_<offer>/`, each with a `BATCH.md` track
 | `tools/fillers.py` | List the ums, uhs and repeated words in a take; `--apply` writes `skip` ranges into an EDL so the render cuts them |
 | `tools/export_timeline.py` | The finished cut as a Premiere / Resolve (FCP7 XML), Final Cut (fcpxml) or OpenTimelineIO timeline pointing at the original files, with graphics and captions as markers |
 | `tools/takes.py` | Every take in a raw recording as its own file, named by what was said; or just the clips one EDL uses (for hand editing later) |
-| `tools/deliver.py` | Sorts finished ads into `deliver/<market>/<offer>/<price>/<ratio>/` with a MANIFEST.csv for uploading to Meta |
+| `tools/deliver.py` | Sorts finished ads into `deliver/<market>/<offer>/<price>/<ratio>/` with a MANIFEST.csv for uploading to Meta, and copies them to Google Drive when `delivery.copy_to` is set |
 | `tools/cutout.py` | Transparent PNG cutouts from photos or renders (rembg, optional) for floating graphics |
 | `tools/reference.py` | Measure a reference ad (cuts, change events per second by hook/body/CTA, loudness, music bed, contact sheet, frames) into a `.analysis.md` so its style can be copied as numbers |
 | `tools/sfx.py` | Synthesized default sound effects (pop, click, whoosh, ding, riser) until licensed ones are in `audio/sfx/` |
