@@ -1066,3 +1066,19 @@ def test_export_timeline_formats(footage):
     sidecar = json.loads(sc.read_text())
     assert len([c for c in v1 if isinstance(c, otio.schema.Clip)]) == len([c for c in sidecar["clips"] if c["src"] != "end_card"])
     assert len(v1.markers) >= len(sidecar["graphics"])
+
+
+def test_deliver_copies_to_synced_folder(footage, tmp_path):
+    import deliver
+    deliver.deliver(footage, "market")
+    drive = tmp_path / "Library" / "CloudStorage" / "GoogleDrive-someone@example.com" / "My Drive"
+    drive.mkdir(parents=True)
+    target = deliver.resolve_copy_to(str(tmp_path / "Library" / "CloudStorage" / "GoogleDrive-*" / "My Drive" / "AuburnSEO Ads"))
+    assert target == drive / "AuburnSEO Ads"
+    dest = deliver.copy_out(footage, target)
+    assert dest == drive / "AuburnSEO Ads" / footage.name and (dest / "MANIFEST.csv").exists()
+    mp4s = list(dest.rglob("*.mp4"))
+    assert mp4s and not list(dest.rglob("raw")) and not list(dest.rglob("work"))
+    assert deliver.copy_out(footage, target) == dest            # second run copies nothing new, no error
+    with pytest.raises(SystemExit):
+        deliver.resolve_copy_to(str(tmp_path / "nope-*" / "My Drive"))
