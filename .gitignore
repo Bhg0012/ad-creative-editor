@@ -42,3 +42,7 @@ batches/*SAMPLE*/
 brand/references/*
 !brand/references/README.md
 !brand/references/NOTES.md
+
+# Training transcripts are third-party text: keep local, commit only distilled rules
+docs/training/*
+!docs/training/README.md
