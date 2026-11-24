@@ -10,3 +10,5 @@ What gets committed instead is the distilled rules, each credited to its source,
 - `playbook/facts.yaml` (dated, sourced facts about Meta delivery and creative)
 
 To process a new file: drop it here and tell Claude in a session "process the new training file".
+
+**Backup of the 20-video library (2026-11-23):** the full `meta_ad_creative_training_transcripts.md` is kept in the private AuburnSEO-LLC repo at `marketing/training/sources/youtube-ad-creative-transcripts-2026-11.md` (one file per video in the folder of the same name). To use it here, copy it into this folder.
